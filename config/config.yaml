@@ -1,0 +1,63 @@
+data:
+  speed: data/speed_data.csv
+  topology: data/10x10_topology.json
+experiments:
+  models:
+    rl_base: true
+    rl_signal: true
+    rl_signal_attention: true
+    shortest_dijkstra: true
+    static_fuel_dijkstra: true
+  repeat: 30
+  routes:
+  - goal: '100113'
+    name: short_01
+    start: '100101'
+    type: short
+  - goal: '100103'
+    name: short_02
+    start: '100121'
+    type: short
+  - goal: '100200'
+    name: long_01
+    start: '100101'
+    type: long
+  - goal: '100191'
+    name: long_02
+    start: '100110'
+    type: long
+  time_slots:
+  - label: off_peak
+    start_hour: 7.0
+  - label: peak
+    start_hour: 8.0
+output:
+  model_dir: models
+  result_dir: output
+physics:
+  accel_ms2: 2.5
+  ifc_ml_s: 0.5
+  speed_min_kmh: 5.0
+  speed_noise: 0.2
+  v_turn_left_kmh: 30.0
+  v_turn_right_kmh: 20.0
+reward:
+  alpha: 1.0
+  arrival_bonus: 500.0
+  penalty_dead: 20.0
+  penalty_timeout: 30.0
+train:
+  batch_size: 128
+  checkpoint_every: 500
+  episodes: 3000
+  epsilon_decay: 0.9985
+  epsilon_min: 0.05
+  epsilon_start: 1.0
+  gamma: 0.97
+  log_interval: 100
+  lr: 0.0005
+  memory_size: 100000
+  multi_route: true
+  shaping_weight: 50.0
+  target_update: 30
+  warmup_steps: 3000

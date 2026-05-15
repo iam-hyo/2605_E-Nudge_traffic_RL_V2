@@ -1,0 +1,176 @@
+"""
+dijkstra_models.py
+------------------
+두 가지 Dijkstra 기반 모델.
+
+  ShortestDijkstra   — 링크 길이(m) 최소화
+  StaticFuelDijkstra — Time-Dependent Dijkstra, 예상 연료 최소화
+                       (속도 기댓값 사용, 신호 시간의존성 반영)
+
+두 클래스 모두 DQNAgent와 동일한 act() 인터페이스를 구현해
+run_experiment.py에서 동일하게 호출 가능.
+"""
+
+from __future__ import annotations
+
+import heapq
+from typing import Optional
+
+import numpy as np
+
+from util.fuel_calculate import SpeedProfile, fuel_idle
+
+
+class _DijkstraBase:
+    """공통 인터페이스."""
+    epsilon = 0.0   # 실험 코드에서 epsilon 참조 시 에러 방지
+
+    def act(self, state: np.ndarray, valid_actions: list[str]) -> str:
+        raise NotImplementedError
+
+    def remember(self, *a, **kw): pass
+    def replay(self): return None
+    def end_episode(self): pass
+    def save(self, path): pass
+    def load(self, path): pass
+
+
+class ShortestDijkstra(_DijkstraBase):
+    """
+    링크 길이 기준 최단 경로.
+    매 스텝 전체 그래프에서 Dijkstra 수행 → 다음 노드 반환.
+    """
+
+    def __init__(self, env):
+        self.env = env
+
+    def _run(self, src: str, goals: set[str]) -> dict[str, str]:
+        """src → 각 노드 최단 경로 prev 테이블 반환."""
+        dist = {src: 0.0}
+        prev: dict[str, Optional[str]] = {src: None}
+        pq   = [(0.0, src)]
+
+        while pq:
+            d, u = heapq.heappop(pq)
+            if d > dist.get(u, float("inf")):
+                continue
+            for v, lid in self.env.adj.get(u, []):
+                nd = d + self.env.links[lid]["len"]
+                if nd < dist.get(v, float("inf")):
+                    dist[v] = nd
+                    prev[v]  = u
+                    heapq.heappush(pq, (nd, v))
+        return prev
+
+    def act(self, state: np.ndarray, valid_actions: list[str]) -> str:
+        src   = self.env.current_node
+        goals = set(self.env.goal_nodes)
+        prev  = self._run(src, goals)
+
+        # 목표 중 도달 가능한 것 선택
+        reachable = [(g, self._path_cost(prev, src, g))
+                     for g in goals if g in prev]
+        if not reachable:
+            return valid_actions[0] if valid_actions else src
+
+        goal = min(reachable, key=lambda x: x[1])[0]
+        path = self._reconstruct(prev, src, goal)
+
+        if len(path) < 2:
+            return valid_actions[0] if valid_actions else src
+        next_node = path[1]
+        return next_node if next_node in valid_actions else (
+            valid_actions[0] if valid_actions else src)
+
+    def _path_cost(self, prev, src, goal):
+        cost = 0.0
+        cur  = goal
+        while prev.get(cur) is not None:
+            p   = prev[cur]
+            lid = next((l for n, l in self.env.adj[p] if n == cur), None)
+            if lid:
+                cost += self.env.links[lid]["len"]
+            cur = p
+        return cost
+
+    def _reconstruct(self, prev, src, goal):
+        path, cur = [], goal
+        while cur is not None:
+            path.append(cur)
+            cur = prev.get(cur)
+        return list(reversed(path))
+
+
+class StaticFuelDijkstra(_DijkstraBase):
+    """
+    Time-Dependent Dijkstra — 예상 연료 최소 경로.
+    속도: CSV 기댓값 사용 (노이즈 없음)
+    신호: 도착 시각 기준 대기 시간 반영
+    """
+
+    def __init__(self, env):
+        self.env = env
+
+    def _expected_speed_ms(self, link_id: str, abs_sec: float) -> float:
+        slot   = max(0, min(23, int((abs_sec - 7 * 3600) // 300)))
+        v_kh   = self.env.speed_db.get(link_id, [35.0] * 24)[slot]
+        return max(5.0, v_kh) / 3.6
+
+    def _link_fuel(self, link_id: str, abs_sec: float, v_entry: float) -> tuple[float, float]:
+        """(연료 mL, 소요 시간 초) 반환."""
+        lk    = self.env.links[link_id]
+        v_ms  = self._expected_speed_ms(link_id, abs_sec)
+        prof  = SpeedProfile(v_ms, v_entry, v_ms * 0.7, lk["len"])
+        t_tr  = prof.total_time()
+        fuel  = prof.total_fuel()
+
+        # 신호 대기
+        dst   = next((n for n, l in self.env.adj.get(lk["end1"], [])
+                      if l == link_id), lk["end2"])
+        t_w   = self.env._calc_wait(dst, abs_sec + t_tr)
+        fuel += fuel_idle(t_w)
+        return fuel, t_tr + t_w
+
+    def _run(self, src: str, abs_start: float):
+        dist = {src: (0.0, abs_start, 5.0)}   # node: (fuel, abs_t, v_exit)
+        prev: dict[str, Optional[str]] = {src: None}
+        pq   = [(0.0, abs_start, 5.0, src)]
+
+        while pq:
+            f, t, v, u = heapq.heappop(pq)
+            if f > dist.get(u, (float("inf"),))[0]:
+                continue
+            for nb, lid in self.env.adj.get(u, []):
+                nf, dt = self._link_fuel(lid, t, v)
+                total_f = f + nf
+                if total_f < dist.get(nb, (float("inf"),))[0]:
+                    v_out = self._expected_speed_ms(lid, t) * 0.7
+                    dist[nb] = (total_f, t + dt, v_out)
+                    prev[nb]  = u
+                    heapq.heappush(pq, (total_f, t + dt, v_out, nb))
+        return prev
+
+    def act(self, state: np.ndarray, valid_actions: list[str]) -> str:
+        src     = self.env.current_node
+        abs_now = self.env.start_time_sec + self.env.current_time
+        goals   = set(self.env.goal_nodes)
+        prev    = self._run(src, abs_now)
+
+        reachable = [g for g in goals if g in prev]
+        if not reachable:
+            return valid_actions[0] if valid_actions else src
+
+        # 연료 기준 최적 목표
+        goal = reachable[0]
+        path = []
+        cur  = goal
+        while cur is not None:
+            path.append(cur)
+            cur = prev.get(cur)
+        path = list(reversed(path))
+
+        if len(path) < 2:
+            return valid_actions[0] if valid_actions else src
+        next_node = path[1]
+        return next_node if next_node in valid_actions else (
+            valid_actions[0] if valid_actions else src)

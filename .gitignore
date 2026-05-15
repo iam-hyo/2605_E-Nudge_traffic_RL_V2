@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pth
+*.pkl
+models/
+output/
+data/*.json
+data/*.csv
+.DS_Store
+*.egg-info/
