@@ -100,8 +100,9 @@ def train_rl(mode: str, use_signal: bool, cfg_path: str = "config/config.yaml",
         f"(decay={tc['epsilon_decay']}, ~{_ep_to_min(tc):.0f}ep)")
     log(f"{'='*60}")
 
-    history    = []
+    history     = []
     total_steps = 0
+    loss_buf: list[float] = []
     t0 = time.time()
 
     for ep in range(1, tc["episodes"] + 1):
@@ -121,8 +122,10 @@ def train_rl(mode: str, use_signal: bool, cfg_path: str = "config/config.yaml",
 
         ep_reward = 0.0
         ep_fuel   = 0.0
+        ep_wait   = 0.0
         ep_steps  = 0
         ep_info   = {}
+        move_counts = {"straight": 0, "left": 0, "right": 0, "uturn": 0}
 
         while True:
             valid = env.get_valid_actions()
@@ -147,13 +150,19 @@ def train_rl(mode: str, use_signal: bool, cfg_path: str = "config/config.yaml",
             # warmup 이전에는 메모리만 채우고 replay 생략
             agent.remember(state, action, reward, next_state, done, next_valid)
             if total_steps >= warmup_steps:
-                agent.replay()
+                loss = agent.replay()
+                if loss is not None:
+                    loss_buf.append(loss)
 
             state      = next_state
             ep_reward += reward
             ep_fuel   += info.get("fuel_total", 0.0)
+            ep_wait   += info.get("wait_time",  0.0)
             ep_steps  += 1
             ep_info    = info
+            mv = info.get("movement", "straight")
+            if mv in move_counts:
+                move_counts[mv] += 1
 
             if done:
                 break
@@ -166,10 +175,12 @@ def train_rl(mode: str, use_signal: bool, cfg_path: str = "config/config.yaml",
             "episode": ep,
             "reward":  round(ep_reward, 3),
             "fuel":    round(ep_fuel, 3),
+            "wait":    round(ep_wait, 1),
             "steps":   ep_steps,
             "epsilon": round(agent.epsilon, 4),
             "reached": reached,
             "route":   route_key,
+            "moves":   move_counts.copy(),
         })
 
         # ── 주기 로그 ─────────────────────────────────────────────────────────
@@ -177,9 +188,27 @@ def train_rl(mode: str, use_signal: bool, cfg_path: str = "config/config.yaml",
             recent     = history[-log_interval:]
             avg_r      = sum(h["reward"]  for h in recent) / len(recent)
             avg_f      = sum(h["fuel"]    for h in recent) / len(recent)
+            avg_w      = sum(h["wait"]    for h in recent) / len(recent)
+            avg_steps  = sum(h["steps"]   for h in recent) / len(recent)
             reach_r    = sum(h["reached"] for h in recent) / len(recent)
             elapsed    = time.time() - t0
             warmup_tag = "" if total_steps >= warmup_steps else " [WARMUP]"
+
+            # 이동 분포 (좌/우/직진)
+            total_moves = {"straight": 0, "left": 0, "right": 0}
+            for h in recent:
+                for k in total_moves:
+                    total_moves[k] += h["moves"].get(k, 0)
+            tot = sum(total_moves.values()) or 1
+            mv_str = (f"straight={total_moves['straight']/tot:.0%}  "
+                      f"left={total_moves['left']/tot:.0%}  "
+                      f"right={total_moves['right']/tot:.0%}")
+
+            # 손실 평균 (최근 1000 replay 호출 기준)
+            loss_str = ""
+            if loss_buf:
+                recent_loss = loss_buf[-1000:]
+                loss_str = f" | Loss={sum(recent_loss)/len(recent_loss):.3f}"
 
             # 경로 타입별 도달률
             rt_str = "  ".join(
@@ -187,11 +216,12 @@ def train_rl(mode: str, use_signal: bool, cfg_path: str = "config/config.yaml",
                 for k, v in sorted(route_reach.items())
             )
             log(f"Ep {ep:4d}/{tc['episodes']} | "
-                f"Reward={avg_r:8.1f} | Fuel={avg_f:5.1f}mL | "
-                f"Reach={reach_r:.0%} | ε={agent.epsilon:.3f} | "
-                f"t={elapsed:.0f}s{warmup_tag}")
+                f"R={avg_r:7.1f} | Fuel={avg_f:5.1f}mL | Wait={avg_w:4.0f}s | "
+                f"Steps={avg_steps:4.1f} | Reach={reach_r:.0%} | "
+                f"ε={agent.epsilon:.3f}{loss_str} | t={elapsed:.0f}s{warmup_tag}")
             if rt_str:
-                log(f"          └ 경로별 도달률(최근50): {rt_str}")
+                log(f"          ├ 경로 도달률(최근50): {rt_str}")
+            log(f"          └ 이동 분포: {mv_str}")
 
             # 최고 도달률 모델 저장
             if reach_r > best_reach_rate and total_steps >= warmup_steps:

@@ -18,6 +18,7 @@ from typing import Optional
 
 import numpy as np
 
+from util.environment import _movement_type
 from util.fuel_calculate import SpeedProfile, fuel_idle
 
 
@@ -116,45 +117,72 @@ class StaticFuelDijkstra(_DijkstraBase):
         v_kh   = self.env.speed_db.get(link_id, [35.0] * 24)[slot]
         return max(5.0, v_kh) / 3.6
 
-    def _link_fuel(self, link_id: str, abs_sec: float, v_entry: float) -> tuple[float, float]:
-        """(연료 mL, 소요 시간 초) 반환."""
-        lk    = self.env.links[link_id]
-        v_ms  = self._expected_speed_ms(link_id, abs_sec)
-        prof  = SpeedProfile(v_ms, v_entry, v_ms * 0.7, lk["len"])
-        t_tr  = prof.total_time()
-        fuel  = prof.total_fuel()
+    def _link_fuel(self, link_id: str, abs_sec: float, v_entry: float,
+                   src: str, prev: Optional[str] = None) -> tuple[float, float]:
+        """
+        (연료 mL, 소요 시간 초) 반환.
 
-        # 신호 대기
-        dst   = next((n for n, l in self.env.adj.get(lk["end1"], [])
-                      if l == link_id), lk["end2"])
-        t_w   = self.env._calc_wait(dst, abs_sec + t_tr)
-        fuel += fuel_idle(t_w)
-        return fuel, t_tr + t_w
+        새 환경 규약(env.step과 동일): 출발 신호 대기 + 링크 통과.
+          - cur 노드(src) 에서 dst 방향 movement 판정
+          - cur 노드 신호의 movement-허용 phase 까지 대기
+          - 대기 후 출발, 링크 통과
+        """
+        lk  = self.env.links[link_id]
+        dst = lk["end2"] if str(lk["end1"]) == str(src) else lk["end1"]
 
-    def _run(self, src: str, abs_start: float):
-        dist = {src: (0.0, abs_start, 5.0)}   # node: (fuel, abs_t, v_exit)
+        cur_pos  = self.env.nodes[src]["pos"]
+        to_pos   = self.env.nodes[dst]["pos"]
+        prev_pos = self.env.nodes[prev]["pos"] if prev and prev != src else None
+        movement = _movement_type(prev_pos, cur_pos, to_pos)
+
+        t_w = self.env._calc_wait(src, abs_sec, movement)
+        abs_depart = abs_sec + t_w
+
+        v_ms = self._expected_speed_ms(link_id, abs_depart)
+        prof = SpeedProfile(v_ms, v_entry, v_ms * 0.7, lk["len"])
+        t_tr = prof.total_time()
+
+        # VT-Micro 출력 L/s → mL 환산 (env.step과 단위 정합)
+        fuel = prof.total_fuel() * 1000.0 + fuel_idle(t_w) * 1000.0
+        return fuel, t_w + t_tr
+
+    def _run(self, src: str, abs_start: float,
+             src_prev: Optional[str] = None):
+        """
+        Time-Dependent Dijkstra.
+
+        state per node: (fuel, abs_t, v_exit, prev_node)
+        prev_node 추적 → 좌/우 movement 판정에 사용.
+        """
+        # (fuel, abs_t, v_exit, prev_node)
+        dist: dict[str, tuple[float, float, float, Optional[str]]] = {
+            src: (0.0, abs_start, 5.0, src_prev)
+        }
         prev: dict[str, Optional[str]] = {src: None}
-        pq   = [(0.0, abs_start, 5.0, src)]
+        pq   = [(0.0, abs_start, 5.0, src, src_prev)]
 
         while pq:
-            f, t, v, u = heapq.heappop(pq)
+            f, t, v, u, u_prev = heapq.heappop(pq)
             if f > dist.get(u, (float("inf"),))[0]:
                 continue
             for nb, lid in self.env.adj.get(u, []):
-                nf, dt = self._link_fuel(lid, t, v)
+                if nb == u_prev:        # U턴 방지
+                    continue
+                nf, dt  = self._link_fuel(lid, t, v, src=u, prev=u_prev)
                 total_f = f + nf
                 if total_f < dist.get(nb, (float("inf"),))[0]:
-                    v_out = self._expected_speed_ms(lid, t) * 0.7
-                    dist[nb] = (total_f, t + dt, v_out)
-                    prev[nb]  = u
-                    heapq.heappush(pq, (total_f, t + dt, v_out, nb))
+                    v_out = self._expected_speed_ms(lid, t + dt) * 0.7
+                    dist[nb] = (total_f, t + dt, v_out, u)
+                    prev[nb] = u
+                    heapq.heappush(pq, (total_f, t + dt, v_out, nb, u))
         return prev
 
     def act(self, state: np.ndarray, valid_actions: list[str]) -> str:
-        src     = self.env.current_node
-        abs_now = self.env.start_time_sec + self.env.current_time
-        goals   = set(self.env.goal_nodes)
-        prev    = self._run(src, abs_now)
+        src      = self.env.current_node
+        src_prev = self.env.previous_node if self.env.previous_node != src else None
+        abs_now  = self.env.start_time_sec + self.env.current_time
+        goals    = set(self.env.goal_nodes)
+        prev     = self._run(src, abs_now, src_prev)
 
         reachable = [g for g in goals if g in prev]
         if not reachable:

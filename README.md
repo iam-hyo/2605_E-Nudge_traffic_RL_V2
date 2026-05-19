@@ -21,7 +21,7 @@ project_root/
 │
 ├── util/
 │   ├── generate_data.py        # topology + speed_data 자동 생성
-│   ├── environment.py          # RoadNetworkEnv (State 59d, step, reset)
+│   ├── environment.py          # RoadNetworkEnv (State 229d, step, reset)
 │   ├── fuel_calculate.py       # VT-Macro + 공회전 연료 계산
 │   ├── reward.py               # 보상 체계 (연료 패널티 + 도착 보너스)
 │   ├── model.py                # QNetworkBase / Signal / Attention
@@ -117,7 +117,7 @@ python experiments/evaluate.py
 - 우회전 목표 속도: 20 km/h / 좌회전: 30 km/h
 - 연료 모델: VT-Macro (주행) + Idle Fuel Rate 0.5 mL/s (신호 대기)
 - 시간 패널티 없음 — 목표는 최소 연료 (시간 trade-off 허용)
-- State 차원: 59 (위치 7 + 시간 3 + 신호 5 + 1-hop 32 + 2-hop 12)
+- State 차원: 229 (위치 5 + 시간 3 + 현재신호 9 + 1-hop 노드 44 + 1-hop 링크 8 + 2-hop 노드 88 + 2-hop 링크 72)
 
 ---
 
