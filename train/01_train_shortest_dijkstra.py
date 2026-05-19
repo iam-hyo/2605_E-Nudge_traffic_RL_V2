@@ -13,7 +13,7 @@ from util.environment import RoadNetworkEnv
 from util.dijkstra_models import ShortestDijkstra
 
 def main(cfg_path="config/config.yaml"):
-    cfg = yaml.safe_load(open(cfg_path))
+    cfg = yaml.safe_load(open(cfg_path, encoding="utf-8"))
     env = RoadNetworkEnv(cfg["data"]["topology"], cfg["data"]["speed"],
                          reward_cfg=cfg["reward"])
     model = ShortestDijkstra(env)
