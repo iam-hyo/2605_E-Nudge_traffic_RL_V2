@@ -87,64 +87,16 @@ def _load_model(name: str, cfg: dict, env: RoadNetworkEnv):
     return agent
 
 
-# ── 신호 강제 유틸 (simulation.py 와 동일한 로직) ────────────────────────────
-def _calc_signal_wait(node: dict, arrive_sec: float) -> float:
-    """적색/황색 → 다음 녹색(또는 좌회전) 페이즈까지 대기. 모든 모델에 공통 적용."""
-    sig = node.get("signal")
-    if sig is None:
-        return 0.0
-    local_t = (arrive_sec + sig["offset"]) % sig["cycle_length"]
-    elapsed = 0.0
-    for ph in sig["phases"]:
-        if elapsed <= local_t < elapsed + ph["duration"]:
-            if ph["type"] in ("red", "yellow"):
-                return elapsed + ph["duration"] - local_t
-            return 0.0
-        elapsed += ph["duration"]
-    return 0.0
-
-
-def _calc_left_turn_wait(from_node: dict, prev_pos: list, from_pos: list,
-                         to_pos: list, current_sec: float) -> float:
-    """좌회전 시 left_turn 페이즈까지 대기. 스크린 좌표 외적 < 0 = 좌회전."""
-    sig = from_node.get("signal")
-    if sig is None:
-        return 0.0
-    if not any(p["type"] == "left_turn" for p in sig["phases"]):
-        return 0.0
-    dx1 = from_pos[0] - prev_pos[0]; dy1 = from_pos[1] - prev_pos[1]
-    if dx1 == 0 and dy1 == 0:
-        return 0.0
-    dx2 = to_pos[0] - from_pos[0];  dy2 = to_pos[1] - from_pos[1]
-    if dx1 * dy2 - dy1 * dx2 >= 0:
-        return 0.0  # 직진 또는 우회전
-    local_t = (current_sec + sig["offset"]) % sig["cycle_length"]
-    elapsed = 0.0
-    for i, ph in enumerate(sig["phases"]):
-        if elapsed <= local_t < elapsed + ph["duration"]:
-            if ph["type"] == "left_turn":
-                return 0.0
-            wait = elapsed + ph["duration"] - local_t
-            n = len(sig["phases"])
-            for j in range(1, n):
-                nxt = sig["phases"][(i + j) % n]
-                if nxt["type"] == "left_turn":
-                    return wait
-                wait += nxt["duration"]
-            return 0.0
-        elapsed += ph["duration"]
-    return 0.0
-
-
 # ── 단일 에피소드 실행 ────────────────────────────────────────────────────────
 def run_episode(model, env: RoadNetworkEnv,
-                start: str, goal: str, start_hour: float,
-                idle_fc: float = 0.5) -> dict:
+                start: str, goal: str, start_hour: float) -> dict:
     """
-    idle_fc: 공회전 연료 소모율 (mL/s). 신호 강제 대기 시간에 적용.
-    모든 모델에 동일한 신호 규칙 적용 (use_signal 설정과 무관).
-      - 적색/황색 도착 → _calc_signal_wait() 로 대기 강제
-      - 좌회전 페이즈 있는 노드에서 좌회전 → _calc_left_turn_wait() 로 대기 강제
+    환경의 step() 이 신호 규칙(movement-aware 대기 + fuel_idle)을 단일 진실
+    공급원으로 처리. 모든 모델 동일 규칙 — 사후 보정 불필요.
+
+    return: 에피소드 KPI dict
+      fuel_total/drive/idle, travel_time, wait_time, distance,
+      wait_count, reached, steps, n_left, n_right, n_straight, path
     """
     state = env.reset(start_node=start, goal_nodes=[goal],
                       start_hour=start_hour)
@@ -154,6 +106,8 @@ def run_episode(model, env: RoadNetworkEnv,
         "travel_time": 0.0, "wait_time": 0.0,
         "distance": 0.0, "wait_count": 0,
         "reached": False, "steps": 0,
+        "n_left": 0, "n_right": 0, "n_straight": 0,
+        "path": [start],
     }
 
     while not done:
@@ -161,59 +115,39 @@ def run_episode(model, env: RoadNetworkEnv,
         if not valid:
             break
 
-        from_node = env.current_node
-        from_pos  = list(env.nodes[from_node]["pos"])
-        prev_node = env.previous_node
-
         action = model.act(state, valid)
-
-        # ① 좌회전 신호 대기 (출발 교차로)
-        lt_wait = 0.0
-        if prev_node != from_node:
-            prev_pos   = list(env.nodes[prev_node]["pos"])
-            to_pos_tmp = list(env.nodes[action]["pos"])
-            cur_sec    = env.start_time_sec + env.current_time
-            lt_wait = _calc_left_turn_wait(
-                env.nodes[from_node], prev_pos, from_pos, to_pos_tmp, cur_sec
-            )
-            if lt_wait > 0:
-                env.current_time += lt_wait
-
         state, reward, done, info = env.step(action)
 
-        to_node = env.current_node
-        info_wt = info.get("wait_time", 0.0)
-
-        # ② 적색 신호 대기 (도착 교차로)
-        arrive_sec = env.start_time_sec + env.current_time - info_wt
-        sim_wt     = _calc_signal_wait(env.nodes[to_node], arrive_sec)
-        extra_wait = sim_wt - info_wt
-        if extra_wait > 0:
-            env.current_time += extra_wait
-
-        # 이 스텝의 총 신호 대기 (공정 비교를 위해 모든 모델 동일 기준)
-        total_wt = lt_wait + sim_wt
-
-        ep["fuel_total"]  += (info.get("fuel_total", 0)
-                              + idle_fc * lt_wait + idle_fc * extra_wait)
-        ep["fuel_drive"]  += info.get("fuel_drive", 0)
-        ep["fuel_idle"]   += (info.get("fuel_idle",  0)
-                              + idle_fc * lt_wait + idle_fc * extra_wait)
-        ep["travel_time"] += info.get("travel_time", 0)
-        ep["wait_time"]   += total_wt
-        ep["distance"]    += info.get("distance", 0)
-        if total_wt > 0:
+        ep["fuel_total"]  += info.get("fuel_total",  0.0)
+        ep["fuel_drive"]  += info.get("fuel_drive",  0.0)
+        ep["fuel_idle"]   += info.get("fuel_idle",   0.0)
+        ep["travel_time"] += info.get("travel_time", 0.0)
+        wt = info.get("wait_time", 0.0)
+        ep["wait_time"]   += wt
+        ep["distance"]    += info.get("distance",    0.0)
+        if wt > 0.5:
             ep["wait_count"] += 1
-        ep["steps"] += 1
-        ep["reached"] = info.get("reached_goal", False)
+        ep["steps"]   += 1
+        ep["reached"]  = info.get("reached_goal", False)
+        ep["path"].append(env.current_node)
 
+        mv = info.get("movement", "straight")
+        if mv == "left":
+            ep["n_left"] += 1
+        elif mv == "right":
+            ep["n_right"] += 1
+        else:
+            ep["n_straight"] += 1
+
+    # CSV 친화적 정리 — path는 string 으로
+    ep["path"] = "->".join(ep["path"])
     return {k: round(v, 4) if isinstance(v, float) else v
             for k, v in ep.items()}
 
 
 # ── 메인 실험 루프 ────────────────────────────────────────────────────────────
 def main(cfg_path: str = "config/config.yaml"):
-    cfg = yaml.safe_load(open(cfg_path))
+    cfg = yaml.safe_load(open(cfg_path, encoding="utf-8"))
 
     # 출력 폴더
     ts     = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -278,10 +212,8 @@ def main(cfg_path: str = "config/config.yaml"):
                 sh    = tslot["start_hour"]
                 reach_cnt = 0
 
-                idle_fc = cfg.get("physics", {}).get("ifc_ml_s", 0.5)
                 for rep in range(1, n_repeat + 1):
-                    result = run_episode(model, env, start, goal, sh,
-                                         idle_fc=idle_fc)
+                    result = run_episode(model, env, start, goal, sh)
                     reach_cnt += int(result["reached"])
                     row = {
                         "model":      m_name,
@@ -325,7 +257,7 @@ def main(cfg_path: str = "config/config.yaml"):
 
 
 def _summarize(rows: list[dict]) -> dict:
-    from collections import defaultdict
+    from collections import defaultdict, Counter
     grouped = defaultdict(list)
     for r in rows:
         key = (r["model"], r["route"], r["time_slot"])
@@ -338,7 +270,11 @@ def _summarize(rows: list[dict]) -> dict:
         times  = [r["travel_time"] + r["wait_time"] for r in reps]
         dists  = [r["distance"]    for r in reps]
         waits  = [r["wait_time"]   for r in reps]
+        steps  = [r["steps"]       for r in reps]
         reached = [r["reached"]    for r in reps]
+        # 가장 빈도 높은 경로 (모델이 안정적인지 확인)
+        path_freq = Counter(r["path"] for r in reps).most_common(1)
+        top_path, top_cnt = path_freq[0] if path_freq else ("", 0)
         summary[k] = {
             "model": model, "route": route, "time_slot": ts,
             "n": len(reps),
@@ -348,20 +284,33 @@ def _summarize(rows: list[dict]) -> dict:
             "time_std":   round(float(np.std(times)),  2),
             "dist_mean":  round(float(np.mean(dists)), 1),
             "wait_mean":  round(float(np.mean(waits)), 2),
+            "wait_count": round(float(np.mean([r["wait_count"] for r in reps])), 2),
+            "steps_mean": round(float(np.mean(steps)), 1),
+            "n_left":     round(float(np.mean([r["n_left"]     for r in reps])), 2),
+            "n_right":    round(float(np.mean([r["n_right"]    for r in reps])), 2),
+            "n_straight": round(float(np.mean([r["n_straight"] for r in reps])), 2),
             "reach_rate": round(float(np.mean(reached)), 3),
+            "top_path":   top_path,
+            "top_path_ratio": round(top_cnt / len(reps), 2),
         }
     return summary
 
 
 def _print_summary(summary: dict):
-    print(f"\n{'모델':<28} {'경로':<12} {'시간대':<10} "
-          f"{'연료(mL)':<12} {'시간(s)':<10} {'도달률'}")
-    print("─" * 80)
+    header = (f"{'모델':<26} {'경로':<10} {'시간대':<10} "
+              f"{'연료mL':<14} {'시간s':<10} {'대기s':<8} "
+              f"{'스텝':<5} {'도달':<5} {'좌/직/우'}")
+    print(f"\n{header}")
+    print("─" * len(header))
     for v in summary.values():
-        print(f"{v['model']:<28} {v['route']:<12} {v['time_slot']:<10} "
-              f"{v['fuel_mean']:>8.1f}±{v['fuel_std']:<5.1f} "
-              f"{v['time_mean']:>8.1f}  "
-              f"{v['reach_rate']:.0%}")
+        mv = f"{v['n_left']:.0f}/{v['n_straight']:.0f}/{v['n_right']:.0f}"
+        print(f"{v['model']:<26} {v['route']:<10} {v['time_slot']:<10} "
+              f"{v['fuel_mean']:>7.1f}±{v['fuel_std']:<5.1f} "
+              f"{v['time_mean']:>7.1f}  "
+              f"{v['wait_mean']:>5.1f}  "
+              f"{v['steps_mean']:>4.1f}  "
+              f"{v['reach_rate']:>4.0%}  "
+              f"{mv}")
 
 
 if __name__ == "__main__":

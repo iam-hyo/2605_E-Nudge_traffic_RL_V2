@@ -78,8 +78,9 @@ def plot_routes(topology_path: str, model_dir: str = "models",
     from util.environment import RoadNetworkEnv
     from util.agent import DQNAgent
     from util.dijkstra_models import ShortestDijkstra, StaticFuelDijkstra
+    from util.viz_scale import viz_params
 
-    cfg = yaml.safe_load(open(cfg_path))
+    cfg = yaml.safe_load(open(cfg_path, encoding="utf-8"))
     env_all  = RoadNetworkEnv(topology_path, cfg["data"]["speed"],
                               reward_cfg=cfg["reward"], use_signal=True)
     env_base = RoadNetworkEnv(topology_path, cfg["data"]["speed"],
@@ -129,6 +130,9 @@ def plot_routes(topology_path: str, model_dir: str = "models",
     keys = filter_models if filter_models else list(ALL_META.keys())
     suffix = "_".join(keys) if filter_models else "all"
 
+    # 자동 스케일 — 36 노드 ~ 1000+ 노드 호환
+    vp = viz_params(env_all.N, env_all.map_diag)
+
     fig, ax = plt.subplots(figsize=(10, 10))
     fig.patch.set_facecolor("#f4f6fb")
     ax.set_facecolor("#eef0f5")
@@ -137,17 +141,18 @@ def plot_routes(topology_path: str, model_dir: str = "models",
     for lk in env_all.links.values():
         p1 = env_all.nodes[lk["end1"]]["pos"]
         p2 = env_all.nodes[lk["end2"]]["pos"]
-        ax.plot([p1[0], p2[0]], [p1[1], p2[1]], color="#d0d3e0", lw=1.5, zorder=1)
+        ax.plot([p1[0], p2[0]], [p1[1], p2[1]],
+                color="#d0d3e0", lw=vp["link_lw"], zorder=1)
 
     # 신호 노드
     for nid, nd in env_all.nodes.items():
         if nd.get("signal"):
-            has_lt = any(p["type"] == "left_turn" for p in nd["signal"]["phases"])
+            has_lt = any(p["type"] in ("left_turn", "left") for p in nd["signal"]["phases"])
             c  = "#1e90ff" if has_lt else "#16c45e"
-            s_ = 80 if has_lt else 55
+            s_ = vp["node_size_lt"] * 0.55 if has_lt else vp["node_size_signal"] * 0.55
             ax.scatter(*nd["pos"], c=c, s=s_, zorder=2, alpha=0.6)
         else:
-            ax.scatter(*nd["pos"], c="#c0c4d6", s=22, zorder=2)
+            ax.scatter(*nd["pos"], c="#c0c4d6", s=vp["node_size_nosig"], zorder=2)
 
     # 경로 (굵은 흰 테두리 + 모델 컬러)
     for key in keys:
@@ -157,16 +162,17 @@ def plot_routes(topology_path: str, model_dir: str = "models",
         path = get_path(model, env_r, start, goal)
         xs = [env_all.nodes[n]["pos"][0] for n in path if n in env_all.nodes]
         ys = [env_all.nodes[n]["pos"][1] for n in path if n in env_all.nodes]
-        ax.plot(xs, ys, lw=7,   color="white",  alpha=0.9, zorder=3,
+        ax.plot(xs, ys, lw=vp["path_bg_lw"] + 1.5, color="white", alpha=0.9, zorder=3,
                 solid_capstyle="round", solid_joinstyle="round")
-        ax.plot(xs, ys, lw=3.5, color=color,  alpha=0.85, zorder=4,
+        ax.plot(xs, ys, lw=vp["path_lw"] + 0.7, color=color, alpha=0.85, zorder=4,
                 solid_capstyle="round", solid_joinstyle="round", label=label)
 
     # 출발/도착 마커
     sp = env_all.nodes.get(start, {}).get("pos", [0, 0])
     gp = env_all.nodes.get(goal,  {}).get("pos", [0, 0])
-    ax.scatter(*sp, c="#16c45e", s=400, marker="*", zorder=9, label=f"출발 {start}")
-    ax.scatter(*gp, c="#f5a623", s=400, marker="*", zorder=9, label=f"도착 {goal}")
+    star_s = max(vp["star_ms"], 200)
+    ax.scatter(*sp, c="#16c45e", s=star_s, marker="*", zorder=9, label=f"출발 {start}")
+    ax.scatter(*gp, c="#f5a623", s=star_s, marker="*", zorder=9, label=f"도착 {goal}")
 
     ax.legend(loc="upper left", fontsize=10, facecolor="white",
               edgecolor="#dde0ea", framealpha=0.95)
@@ -187,7 +193,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--mode",     default="learning",
                         choices=["learning", "route"])
-    parser.add_argument("--topology", default="data/10x10_topology.json")
+    parser.add_argument("--topology", default="data/6x6_topology.json")
     parser.add_argument("--start",    default=None)
     parser.add_argument("--goal",     default=None)
     parser.add_argument("--models",   nargs="+", default=None,

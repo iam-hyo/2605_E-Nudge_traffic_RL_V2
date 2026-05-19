@@ -354,7 +354,7 @@ def main():
     if invalid:
         parser.error(f"알 수 없는 모델: {invalid}")
 
-    cfg = yaml.safe_load(open(args.config, encoding="utf-8"))
+    cfg = yaml.safe_load(open(args.config, encoding="utf-8", encoding="utf-8"))
 
     # 출력 폴더: output/visualize/YYYYMMDD/
     date_str = datetime.datetime.now().strftime("%Y%m%d")

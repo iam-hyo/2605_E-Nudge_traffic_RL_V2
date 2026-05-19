@@ -1,13 +1,22 @@
 """
 model.py
 --------
-QNetwork 세 가지 변형.
+QNetwork 세 가지 변형 (State 229d 기준).
 
-  QNetworkBase      — 신호 State 없음, Linear only
-  QNetworkSignal    — 신호 State 포함, Linear only
-  QNetworkAttention — 신호 State 포함, Self-Attention (1-hop/2-hop 이웃)
+  QNetworkBase      — 신호 State 미사용 (마스킹)
+  QNetworkSignal    — 신호 State 포함, 단순 MLP + Dueling
+  QNetworkAttention — 신호 State 포함, 노드 13토큰 × 14d Self-Attention
 
 모두 Dueling DQN 구조 (Value + Advantage stream).
+
+State 229d 구조 (environment.py와 동기):
+  s[0:5]      위치 (5d)
+  s[5:8]      시간 (3d)
+  s[8:17]     현재 신호 (9d)
+  s[17:61]    1-hop 노드 4×11=44d  (각 11d = pos 2 + sig 9)
+  s[61:69]    1-hop 링크 4×2=8d    (각 2d = len + speed)
+  s[69:157]   2-hop 노드 8×11=88d  (각 11d = pos 2 + sig 9)
+  s[157:229]  2-hop 링크 12×6=72d  (각 6d = len + speed + parent_onehot[4])
 """
 
 from __future__ import annotations
@@ -16,24 +25,41 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-# State 구조 상수
-GLOBAL_DIM  = 15    # s[0–14]: 위치(7) + 시간(3) + 현재신호(5)
-K_HOP1      = 4
-M_HOP2      = 4
-HOP1_FEAT   = 8     # 1-hop 이웃 1개당 피처 수
-HOP2_FEAT   = 3     # 2-hop 이웃 1개당 피처 수
-STATE_SIZE  = 59
+# ── State 구조 상수 (environment.py와 일치) ──────────────────────────────────
+K_HOP1     = 4
+N_HOP2     = 8
+L_HOP2     = 12
 
-# Base 모델용: 신호 피처 제외한 차원
-# 위치(7) + 시간(3) + 1-hop 위치·속도·길이만(4×4=16) + 2-hop 속도만(4×1=4) = 30
-BASE_DIM    = 30
-EMBED_DIM   = 64
+POS_DIM    = 5
+TIME_DIM   = 3
+SIG_DIM    = 9
+NODE_DIM   = 11       # pos(2) + sig(9)
+LINK1_DIM  = 2        # len + speed
+LINK2_DIM  = 6        # len + speed + parent_onehot[4]
+
+# 슬라이스 인덱스
+IDX_POS_END        = POS_DIM                                  # 5
+IDX_TIME_END       = IDX_POS_END + TIME_DIM                   # 8
+IDX_CUR_SIG_END    = IDX_TIME_END + SIG_DIM                   # 17
+IDX_HOP1_NODES_END = IDX_CUR_SIG_END + K_HOP1 * NODE_DIM      # 61
+IDX_HOP1_LINKS_END = IDX_HOP1_NODES_END + K_HOP1 * LINK1_DIM  # 69
+IDX_HOP2_NODES_END = IDX_HOP1_LINKS_END + N_HOP2 * NODE_DIM   # 157
+IDX_HOP2_LINKS_END = IDX_HOP2_NODES_END + L_HOP2 * LINK2_DIM  # 229
+STATE_SIZE         = IDX_HOP2_LINKS_END                        # 229
+
+# Attention 모델용
+NODE_TOK_DIM   = NODE_DIM + 3        # +hop_onehot[3] → 14
+GLOBAL_FEAT    = POS_DIM + TIME_DIM  # 8
+LINK_BLOCK_DIM = K_HOP1 * LINK1_DIM + L_HOP2 * LINK2_DIM   # 8 + 72 = 80
+
+EMBED_DIM      = 64
+N_NODE_TOKENS  = 1 + K_HOP1 + N_HOP2   # cur + hop1 + hop2 = 13
 
 
 def _dueling_head(in_dim: int, action_size: int) -> tuple[nn.Module, nn.Module]:
-    value = nn.Sequential(nn.Linear(in_dim, 64), nn.ReLU(), nn.Linear(64, 1))
-    adv   = nn.Sequential(nn.Linear(in_dim, 64), nn.ReLU(),
-                          nn.Linear(64, action_size))
+    value = nn.Sequential(nn.Linear(in_dim, 128), nn.ReLU(), nn.Linear(128, 1))
+    adv   = nn.Sequential(nn.Linear(in_dim, 128), nn.ReLU(),
+                          nn.Linear(128, action_size))
     return value, adv
 
 
@@ -43,25 +69,33 @@ def _q_from_dueling(value: torch.Tensor, adv: torch.Tensor) -> torch.Tensor:
 
 # ── Base 모델 ─────────────────────────────────────────────────────────────────
 class QNetworkBase(nn.Module):
-    """신호 정보 미사용. 위치·시간·1-hop 속도/거리만 사용."""
+    """
+    신호 정보 미사용. 위치·시간·1-hop/2-hop 위치/링크 정보만 사용.
+    State 차원은 통일 (229d) 하되, forward 진입 시 신호 차원을 0으로 마스킹.
+    """
 
     def __init__(self, action_size: int):
         super().__init__()
-        # 신호 관련 피처(s[10–14], s[20–22 per hop1, s[47–58]) 제외한 간소화 State 사용
-        # 실제로는 전체 State 59d 입력 후 신호 차원을 0으로 마스킹 — 인터페이스 통일
-        self.fc1 = nn.Linear(STATE_SIZE, 256)
-        self.fc2 = nn.Linear(256, 128)
-        self.value, self.adv = _dueling_head(128, action_size)
+        self.fc1 = nn.Linear(STATE_SIZE, 512)
+        self.fc2 = nn.Linear(512, 256)
+        self.value, self.adv = _dueling_head(256, action_size)
+
+    def _mask_signal(self, state: torch.Tensor) -> torch.Tensor:
+        x = state.clone()
+        # 현재 신호
+        x[:, IDX_TIME_END:IDX_CUR_SIG_END] = 0.0
+        # 1-hop 노드 각각의 신호 부분 (pos 뒤 9d)
+        for k in range(K_HOP1):
+            base = IDX_CUR_SIG_END + k * NODE_DIM
+            x[:, base + 2 : base + NODE_DIM] = 0.0
+        # 2-hop 노드 각각의 신호 부분
+        for n in range(N_HOP2):
+            base = IDX_HOP1_LINKS_END + n * NODE_DIM
+            x[:, base + 2 : base + NODE_DIM] = 0.0
+        return x
 
     def forward(self, state: torch.Tensor) -> torch.Tensor:
-        # 신호 관련 인덱스를 0으로 마스킹 (s[10–14], 1-hop sin/cos/remain/has_lt)
-        x = state.clone()
-        x[:, 10:15] = 0.0          # 현재 신호
-        for k in range(K_HOP1):
-            base = GLOBAL_DIM + k * HOP1_FEAT
-            x[:, base + 4:base + 8] = 0.0   # sin, cos, remain, has_lt
-        x[:, GLOBAL_DIM + K_HOP1 * HOP1_FEAT:] = 0.0  # 2-hop 전체
-
+        x = self._mask_signal(state)
         x = F.relu(self.fc1(x))
         x = F.relu(self.fc2(x))
         return _q_from_dueling(self.value(x), self.adv(x))
@@ -73,9 +107,9 @@ class QNetworkSignal(nn.Module):
 
     def __init__(self, action_size: int):
         super().__init__()
-        self.fc1 = nn.Linear(STATE_SIZE, 256)
-        self.fc2 = nn.Linear(256, 128)
-        self.value, self.adv = _dueling_head(128, action_size)
+        self.fc1 = nn.Linear(STATE_SIZE, 512)
+        self.fc2 = nn.Linear(512, 256)
+        self.value, self.adv = _dueling_head(256, action_size)
 
     def forward(self, state: torch.Tensor) -> torch.Tensor:
         x = F.relu(self.fc1(state))
@@ -88,57 +122,127 @@ class QNetworkAttention(nn.Module):
     """
     신호 State 포함 + Self-Attention.
 
-    Query  = 글로벌 컨텍스트 s[0–14] → Linear → 64d
-    Key/Value = 1-hop × 4 + 2-hop × 4 토큰 → Linear → 64d each
+    아키텍처:
+      1. flat 229d → 토큰 분해
+         · 노드 토큰 13개 × 14d (pos 2 + sig 9 + hop_onehot 3)
+         · 글로벌 컨텍스트 (위치 + 시간 + 현재 신호) → 쿼리
+         · 링크 블록 80d → MLP 압축 (별도 보조 feature)
+      2. 쿼리(글로벌)로 노드 토큰에 cross-attention
+      3. fused = [global, attn_out, link_emb] → Dueling head
+
+    노드 토큰 구조:
+      [0]      = cur 노드 (hop_onehot=[1,0,0])
+      [1..4]   = 1-hop K=4 (hop_onehot=[0,1,0])
+      [5..12]  = 2-hop N=8 (hop_onehot=[0,0,1])
     """
 
     def __init__(self, action_size: int):
         super().__init__()
-        self.global_enc = nn.Sequential(
-            nn.Linear(GLOBAL_DIM, EMBED_DIM), nn.ReLU()
+        # 쿼리: 위치(5) + 시간(3) + 현재 신호(9) = 17d
+        self.query_enc = nn.Sequential(
+            nn.Linear(POS_DIM + TIME_DIM + SIG_DIM, EMBED_DIM), nn.ReLU(),
         )
-        self.hop1_enc = nn.Linear(HOP1_FEAT, EMBED_DIM)
-        self.hop2_enc = nn.Linear(HOP2_FEAT, EMBED_DIM)
-
+        # 노드 토큰 인코더 (14d → 64)
+        self.node_enc = nn.Sequential(
+            nn.Linear(NODE_TOK_DIM, EMBED_DIM), nn.ReLU(),
+        )
+        # 링크 블록 인코더 (80d → 64)
+        self.link_enc = nn.Sequential(
+            nn.Linear(LINK_BLOCK_DIM, 128), nn.ReLU(),
+            nn.Linear(128, EMBED_DIM), nn.ReLU(),
+        )
         self.attn = nn.MultiheadAttention(
-            embed_dim=EMBED_DIM, num_heads=4, batch_first=True
+            embed_dim=EMBED_DIM, num_heads=4, batch_first=True,
         )
 
-        fused = EMBED_DIM * 2   # global(64) + attn_out(64)
+        # 전역 글로벌(위치+시간만, 신호 제외 — 신호는 쿼리에 포함됨)
+        self.global_enc = nn.Sequential(
+            nn.Linear(GLOBAL_FEAT, EMBED_DIM), nn.ReLU(),
+        )
+
+        fused = EMBED_DIM * 3   # global(64) + attn_out(64) + link_emb(64)
         self.value, self.adv = _dueling_head(fused, action_size)
 
-    def _pad_mask(self, state: torch.Tensor, B: int) -> torch.Tensor:
-        """패딩 토큰(모든 값 0) True → attention에서 -inf."""
-        h1 = state[:, GLOBAL_DIM: GLOBAL_DIM + K_HOP1 * HOP1_FEAT]
-        h1 = h1.view(B, K_HOP1, HOP1_FEAT)
-        pad1 = (h1.abs().sum(-1) == 0)
+    @staticmethod
+    def _build_node_tokens(state: torch.Tensor) -> torch.Tensor:
+        """
+        flat state → 노드 토큰 (B, 13, 14).
+        토큰 = [cur, hop1×4, hop2×8], 각 14d = pos(2) + sig(9) + hop_onehot(3).
+        """
+        B   = state.shape[0]
+        dev = state.device
 
-        h2 = state[:, GLOBAL_DIM + K_HOP1 * HOP1_FEAT:]
-        h2 = h2.view(B, M_HOP2, HOP2_FEAT)
-        pad2 = (h2.abs().sum(-1) == 0)
+        pos     = state[:, 0:2]                                  # cur 좌표만
+        cur_sig = state[:, IDX_TIME_END:IDX_CUR_SIG_END]         # (B, 9)
 
-        return torch.cat([pad1, pad2], dim=1)   # (B, K+M)
+        hop1_nodes = state[:, IDX_CUR_SIG_END:IDX_HOP1_NODES_END]\
+                     .view(B, K_HOP1, NODE_DIM)                  # (B, 4, 11)
+        hop2_nodes = state[:, IDX_HOP1_LINKS_END:IDX_HOP2_NODES_END]\
+                     .view(B, N_HOP2, NODE_DIM)                  # (B, 8, 11)
+
+        # 1) cur 토큰: pos(2) + cur_sig(9) + [1,0,0]
+        cur_onehot = torch.zeros(B, 3, device=dev)
+        cur_onehot[:, 0] = 1.0
+        cur_tok = torch.cat([pos, cur_sig, cur_onehot], dim=1).unsqueeze(1)   # (B,1,14)
+
+        # 2) hop1 토큰: 11d + [0,1,0]
+        hop1_oh = torch.zeros(B, K_HOP1, 3, device=dev)
+        hop1_oh[:, :, 1] = 1.0
+        hop1_tok = torch.cat([hop1_nodes, hop1_oh], dim=-1)                   # (B,4,14)
+
+        # 3) hop2 토큰: 11d + [0,0,1]
+        hop2_oh = torch.zeros(B, N_HOP2, 3, device=dev)
+        hop2_oh[:, :, 2] = 1.0
+        hop2_tok = torch.cat([hop2_nodes, hop2_oh], dim=-1)                   # (B,8,14)
+
+        return torch.cat([cur_tok, hop1_tok, hop2_tok], dim=1)                # (B,13,14)
+
+    @staticmethod
+    def _pad_mask(node_tokens: torch.Tensor) -> torch.Tensor:
+        """
+        패딩 토큰 감지: environment에서 패딩 노드는 pos=(-1,-1) sentinel 사용.
+        실제 노드는 pos ∈ [0,1] 이므로 pos_x < 0 으로 안전하게 구분 가능.
+        (이전 'all-zero' 방식은 좌상단 코너 + 비신호 노드를 패딩으로 오인식)
+        cur 토큰은 항상 실제 (pos 비제로) → 마스크 False 보장.
+        """
+        pos_x = node_tokens[..., 0]                       # (B, 13)
+        mask  = pos_x < 0.0                                # (B, 13) — padding 표식
+        mask[:, 0] = False                                 # cur 토큰 보호
+        return mask
 
     def forward(self, state: torch.Tensor) -> torch.Tensor:
         B = state.shape[0]
 
-        g_enc = self.global_enc(state[:, :GLOBAL_DIM])   # (B, 64)
+        # ── 분해 ──────────────────────────────────────────────────────────────
+        pos_block   = state[:, 0:IDX_POS_END]                                # (B, 5)
+        time_block  = state[:, IDX_POS_END:IDX_TIME_END]                     # (B, 3)
+        cur_sig     = state[:, IDX_TIME_END:IDX_CUR_SIG_END]                 # (B, 9)
+        hop1_links  = state[:, IDX_HOP1_NODES_END:IDX_HOP1_LINKS_END]        # (B, 8)
+        hop2_links  = state[:, IDX_HOP2_NODES_END:IDX_HOP2_LINKS_END]        # (B, 72)
 
-        h1 = state[:, GLOBAL_DIM: GLOBAL_DIM + K_HOP1 * HOP1_FEAT]
-        h1 = F.relu(self.hop1_enc(h1.view(B, K_HOP1, HOP1_FEAT)))  # (B,4,64)
+        # ── 쿼리: 위치 + 시간 + 현재 신호 ─────────────────────────────────────
+        q_in   = torch.cat([pos_block, time_block, cur_sig], dim=1)          # (B, 17)
+        q_emb  = self.query_enc(q_in).unsqueeze(1)                           # (B, 1, 64)
 
-        h2 = state[:, GLOBAL_DIM + K_HOP1 * HOP1_FEAT:]
-        h2 = F.relu(self.hop2_enc(h2.view(B, M_HOP2, HOP2_FEAT)))  # (B,4,64)
+        # ── 노드 토큰 + Attention ────────────────────────────────────────────
+        node_tok  = self._build_node_tokens(state)                           # (B, 13, 14)
+        pad_mask  = self._pad_mask(node_tok)                                 # (B, 13)
+        node_emb  = self.node_enc(node_tok)                                  # (B, 13, 64)
 
-        query   = g_enc.unsqueeze(1)                           # (B,1,64)
-        context = torch.cat([h1, h2], dim=1)                   # (B,8,64)
-        mask    = self._pad_mask(state, B)
+        attn_out, _ = self.attn(q_emb, node_emb, node_emb,
+                                key_padding_mask=pad_mask)
+        attn_out = attn_out.squeeze(1)                                       # (B, 64)
 
-        attn_out, _ = self.attn(query, context, context,
-                                key_padding_mask=mask)
-        attn_out = attn_out.squeeze(1)                         # (B,64)
+        # ── 링크 보조 feature ─────────────────────────────────────────────────
+        link_block = torch.cat([hop1_links, hop2_links], dim=1)              # (B, 80)
+        link_emb   = self.link_enc(link_block)                                # (B, 64)
 
-        fused = torch.cat([g_enc, attn_out], dim=1)            # (B,128)
+        # ── 전역 컨텍스트 ─────────────────────────────────────────────────────
+        global_emb = self.global_enc(
+            torch.cat([pos_block, time_block], dim=1)                        # (B, 8)
+        )                                                                     # (B, 64)
+
+        fused = torch.cat([global_emb, attn_out, link_emb], dim=1)           # (B, 192)
         return _q_from_dueling(self.value(fused), self.adv(fused))
 
 

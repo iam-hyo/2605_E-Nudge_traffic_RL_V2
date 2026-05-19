@@ -141,7 +141,7 @@ def main():
     parser.add_argument("--config", default="config/config.yaml")
     args = parser.parse_args()
 
-    cfg = yaml.safe_load(open(args.config, encoding="utf-8"))
+    cfg = yaml.safe_load(open(args.config, encoding="utf-8", encoding="utf-8"))
 
     steps = {
         "data":       [step_data],
