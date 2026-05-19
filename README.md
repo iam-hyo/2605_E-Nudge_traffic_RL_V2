@@ -131,6 +131,7 @@ python simulation.py --models shortest_dijkstra rl_base --route long_01 --time_s
 
 # 전체 모델
 python simulation.py --models all --route short_01 --time_slot off_peak
+
 ```
 
 ### 속도 / 주사율 조절
