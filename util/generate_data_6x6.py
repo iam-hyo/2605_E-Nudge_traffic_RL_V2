@@ -93,26 +93,25 @@ def make_signal(row: int, col: int, rng: random.Random):
         # 무신호 — 모든 방향 통행 허용
         return None, True
 
+    # 모든 phase 최소 15초 (시각화 부담 ↓). yellow 폐기 — 본 시뮬은 적색 일원화.
     if cat == "core_strong":
-        # 매우 빡빡: 110s 사이클 중 녹색 5s (4.5%), 적색 100s
-        cycle = 110
-        green, yellow, red = 5, 5, 100
+        # 매우 빡빡: 180s 사이클, 녹색 15s (8.3%), 적색 165s
+        cycle = 180
+        green, red = 15, 165
         phases = [
-            {"type": "green",  "duration": green},
-            {"type": "yellow", "duration": yellow},
-            {"type": "red",    "duration": red},
+            {"type": "green", "duration": green},
+            {"type": "red",   "duration": red},
         ]
         return {"cycle_length": cycle, "offset": rng.randint(0, cycle - 1),
                 "phases": phases}, False
 
     if cat == "core_weak":
-        # 빡빡: 90s 사이클 중 녹색 10s (11%), 적색 75s
-        cycle = 90
-        green, yellow, red = 10, 5, 75
+        # 빡빡: 120s 사이클, 녹색 15s (12.5%), 적색 105s
+        cycle = 120
+        green, red = 15, 105
         phases = [
-            {"type": "green",  "duration": green},
-            {"type": "yellow", "duration": yellow},
-            {"type": "red",    "duration": red},
+            {"type": "green", "duration": green},
+            {"type": "red",   "duration": red},
         ]
         return {"cycle_length": cycle, "offset": rng.randint(0, cycle - 1),
                 "phases": phases}, False
@@ -120,21 +119,19 @@ def make_signal(row: int, col: int, rng: random.Random):
     # outer — 50% 확률로 좌회전 phase 포함
     has_left = (nid % 2 == 0)   # 결정론적 패턴 (재현성)
     if has_left:
-        cycle = 65
-        green, left, yellow, red = 40, 10, 5, 10
+        cycle = 75
+        green, left, red = 45, 15, 15
         phases = [
             {"type": "green",     "duration": green},
             {"type": "left_turn", "duration": left},
-            {"type": "yellow",    "duration": yellow},
             {"type": "red",       "duration": red},
         ]
     else:
         cycle = 60
-        green, yellow, red = 50, 5, 5
+        green, red = 45, 15
         phases = [
-            {"type": "green",  "duration": green},
-            {"type": "yellow", "duration": yellow},
-            {"type": "red",    "duration": red},
+            {"type": "green", "duration": green},
+            {"type": "red",   "duration": red},
         ]
     # green wave: col 진행 방향으로 offset 동기 (코어와 별개로 외곽 자체 동조)
     offset = (col * 4) % cycle

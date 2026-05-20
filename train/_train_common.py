@@ -236,8 +236,25 @@ def train_rl(mode: str, use_signal: bool, cfg_path: str = "config/config.yaml",
 
     # ── 최종 저장 ─────────────────────────────────────────────────────────────
     agent.save(str(model_dir / f"{name}.pth"))
+
+    # history.json 에 학습 metadata 헤더 포함 (가시성 / 호환성 검증용)
+    train_meta = {
+        "model_name":    name,
+        "mode":          mode,
+        "use_signal":    use_signal,
+        "topology":      cfg["data"]["topology"],
+        "speed":         cfg["data"]["speed"],
+        "episodes":      tc["episodes"],
+        "reward_cfg":    cfg.get("reward", {}),
+        "shaping_w":     shaping_w,
+        "trained_at":    time.strftime("%Y-%m-%d %H:%M:%S"),
+        "elapsed_sec":   round(time.time() - t0, 1),
+        "n_nodes":       env.N,
+        "n_links":       len(env.links),
+    }
+    out_payload = {"metadata": train_meta, "history": history}
     with open(model_dir / f"{name}_history.json", "w", encoding="utf-8") as f:
-        json.dump(history, f, ensure_ascii=False, indent=2)
+        json.dump(out_payload, f, ensure_ascii=False, indent=2)
 
     final_reach = sum(h["reached"] for h in history[-200:]) / min(200, len(history))
     log(f"\n{'='*60}")

@@ -31,8 +31,10 @@ def plot_learning_curves(model_dir: str = "models"):
 
     fig, axes = plt.subplots(1, 2, figsize=(12, 5))
     for h_path in sorted(histories):
-        with open(h_path) as f:
-            hist = json.load(f)
+        with open(h_path, encoding="utf-8") as f:
+            data = json.load(f)
+        # 새 포맷: {"metadata":..., "history":[...]}  / 구 포맷: [...] 직접
+        hist = data["history"] if isinstance(data, dict) and "history" in data else data
         name = h_path.stem.replace("_history", "")
         eps  = [h["episode"] for h in hist]
         rews = [h["reward"]  for h in hist]

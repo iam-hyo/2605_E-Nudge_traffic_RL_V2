@@ -1,6 +1,6 @@
 data:
   speed: data/6x6_speed_data.csv
-  topology: data/6x6_topology.json
+  topology: data/6x6_cross_topology.json
 experiments:
   models:
     rl_base: true
@@ -10,22 +10,24 @@ experiments:
     static_fuel_dijkstra: true
   repeat: 30
   routes:
-  # 6x6 테스트베드 — 모든 경로가 "코어 직진(신호 빡빡) vs 외곽 우회(신호 유함)" 갈등 유발
-  - goal: '18'                 # 우측 중단 — 사용자 예시 경로
-    name: short_01
-    start: '1'                 # 좌하단
-    type: short
-  - goal: '24'                 # 우측 row3
-    name: short_02
-    start: '7'                 # 좌측 row1
-    type: short
-  - goal: '36'                 # 우상단 (대각선)
-    name: long_01
+  # 6x6 cross 사선 토폴로지 — 핵심 case: 1→36
+  #  · B 사선(명시적 최단, 거리 3884m, 신호 불리)  ← Shortest 선택
+  #  · C 사선(명시적 비최단, 거리 4200m, 신호 우호) ← Signal-aware 가 선택해야
+  - goal: '36'
+    name: cross_main
     start: '1'
     type: long
-  - goal: '31'                 # 좌상단 (반대 대각선)
-    name: long_02
-    start: '6'                 # 우하단
+  - goal: '33'                 # 보조: C 사선 종점 (학습 다양성)
+    name: cross_aux1
+    start: '3'
+    type: long
+  - goal: '32'                 # 보조: B 사선 종점
+    name: cross_aux2
+    start: '2'
+    type: long
+  - goal: '31'                 # 보조: 좌변 사선
+    name: cross_aux3
+    start: '1'
     type: long
   time_slots:
   - label: off_peak
@@ -44,13 +46,13 @@ physics:
   v_turn_right_kmh: 20.0
 reward:
   alpha: 1.0           # 연료 패널티 계수 (mL 기준)
-  arrival_bonus: 500.0
+  arrival_bonus: 200.0   # 0520_2: 500→200, fuel 절감 인센티브 강화
   penalty_dead: 0.0    # 단일화: 도착 보너스 미수령이 자연 패널티
   penalty_timeout: 0.0
 train:
   batch_size: 128
   checkpoint_every: 300
-  episodes: 800          # 6x6 테스트베드용 — 강남구 전환 시 3000으로 복귀 권장
+  episodes: 1500         # 0520_2 case study: 800→1500 로 학습 강화
   epsilon_decay: 0.997
   epsilon_min: 0.05
   epsilon_start: 1.0
@@ -61,4 +63,4 @@ train:
   multi_route: true
   shaping_weight: 0.0  # 단일화: 연료 + 도착만으로 학습 (potential-based shaping 비활성화)
   target_update: 25
-  warmup_steps: 800
+  warmup_steps: 1500

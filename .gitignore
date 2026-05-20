@@ -1,11 +1,27 @@
+# ── Python ───────────────────────────────────────────────
 __pycache__/
 *.pyc
 *.pyo
-*.pth
-*.pkl
-models/
-output/
-data/*.json
-data/*.csv
-.DS_Store
 *.egg-info/
+
+# ── 가상환경 — 절대 커밋 금지 (수백 MB + 플랫폼 종속) ──────
+venv/
+.venv/
+env/
+
+# ── Claude Code 메타 (worktree·세션) ─────────────────────
+.claude/
+
+# ── OS ───────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ── data/ 와 models/ 는 서버 이전을 위해 커밋에 포함 ──────
+#   (data ~1.6MB, models ~56MB — GitHub 한계 대비 충분히 작음)
+#   단 중간 학습 체크포인트는 용량 절약 위해 제외:
+models/*_ep*.pth
+
+# ── output/ 실험 산출물은 서버에서 재생성 ────────────────
+#   타임스탬프 폴더는 제외, 루트의 학습곡선 png 는 포함
+output/*/
+output/gif/

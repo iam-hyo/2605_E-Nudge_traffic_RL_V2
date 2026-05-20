@@ -165,8 +165,17 @@ class RoadNetworkEnv:
         speed_path:    str,
         reward_cfg:    Optional[dict] = None,
         use_signal:    bool = True,
+        deterministic_speed: bool = False,
     ):
+        """
+        deterministic_speed:
+          True  → (link_id, slot) 해시 기반 결정론적 노이즈.
+                  같은 링크·같은 시간대는 모든 모델·모든 호출에서 동일 속도.
+                  시뮬레이션 시각화에서 모델 간 wall-clock 동기화에 필수.
+          False → random.gauss (학습/평가용 기본)
+        """
         self.use_signal = use_signal
+        self.deterministic_speed = deterministic_speed
         self.reward_calc = RewardCalculator(**(reward_cfg or {}))
 
         # ── 토폴로지 로드 ─────────────────────────────────────────────────────
@@ -248,13 +257,20 @@ class RoadNetworkEnv:
 
     def _get_link_speed_ms(self, link_id: str, abs_sec: float) -> float:
         """
-        링크 속도 샘플링 (m/s).
-        양방향 동일 속도. 노이즈 20% 가우시안.
+        링크 속도 샘플링 (m/s). 양방향 동일 속도, ±20% 가우시안 노이즈.
+
+        deterministic_speed=True 일 때 (link_id, slot) 해시 RNG 사용 →
+        모든 모델이 같은 링크·같은 시간대에서 동일 속도. 시뮬레이션 시각화의
+        Driver 일관성 확보용.
         """
         slot    = self._time_slot(abs_sec)
         base_kh = self.speed_db.get(link_id, [35.0] * 24)[slot]
         sigma   = base_kh * NOISE_SIGMA
-        v_kh    = random.gauss(base_kh, sigma)
+        if self.deterministic_speed:
+            rng = random.Random(hash((link_id, slot)) & 0xFFFFFFFF)
+            v_kh = rng.gauss(base_kh, sigma)
+        else:
+            v_kh = random.gauss(base_kh, sigma)
         v_kh    = max(SPEED_MIN, v_kh)
         return v_kh / 3.6   # → m/s
 

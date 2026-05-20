@@ -100,6 +100,29 @@ def _signal_color(node: dict, abs_sec: float) -> str:
     return SIGNAL_COLORS.get(ph, NO_SIG_COLOR)
 
 
+def _node_phase_state(node: dict, abs_sec: float):
+    """
+    노드의 현재 phase 상태.
+    반환: (phase_type, remain_ratio, color)  / 무신호면 None
+      remain_ratio: 현재 phase 중 남은 비율 (0~1)
+    """
+    sig = node.get("signal")
+    if sig is None:
+        return None
+    cycle  = sig["cycle_length"]
+    offset = sig.get("offset", 0)
+    local_t = (abs_sec + offset) % cycle
+    elapsed = 0.0
+    for ph in sig["phases"]:
+        if elapsed <= local_t < elapsed + ph["duration"]:
+            remain = (elapsed + ph["duration"] - local_t) / ph["duration"]
+            ph_type = ph["type"]
+            color   = SIGNAL_COLORS.get(ph_type, NO_SIG_COLOR)
+            return ph_type, remain, color
+        elapsed += ph["duration"]
+    return None
+
+
 # 신호 대기/좌회전 규칙은 모두 util/environment.py 의 step() 안에서 통합 처리.
 # 시뮬레이션은 env.step 의 결과(wait_time, abs_depart, movement, fuel_idle)를 그대로 사용.
 
@@ -131,86 +154,95 @@ def _load_model(name: str, cfg: dict, env: RoadNetworkEnv):
     return agent
 
 
-# ── 에이전트 상태 + 애니메이션 머신 ──────────────────────────────────────────
+# ── 에이전트 상태 머신 ────────────────────────────────────────────────────────
 class _AgentState:
     """
-    한 에이전트의 시뮬레이션 + 애니메이션 상태.
+    Global wall-clock 기반 에이전트.
 
-    모드 전이:
-      idle → (prepare_next) → waiting? → traveling → ... → done
+    핵심: 모든 agent 가 같은 sim_time 을 공유한다. 매 frame Simulator.sim_time 이
+    sim_dt 만큼 진행하면, 각 agent.advance_to(sim_time) 가 자기 link 안에서의
+    위치·모드를 갱신한다. 빠른 agent는 같은 sim_time 안에서 더 많은 link 를
+    통과한다 (env.step 호출이 더 빠르게 누적).
 
-    신호 준수: environment.RoadNetworkEnv.step() 이 movement-aware 출발 대기를
-              단일 진실 공급원으로 처리. 모든 모델이 동일 규칙으로 운전(Driver
-              일관성). 시뮬레이션은 env.step 의 info를 그대로 신뢰.
+    link 안 구성: [waiting (t_wait)] → [traveling (t_travel)]
+    위치 보간: traveling 구간에서 ease-in-out (3t²−2t³) — 시작/끝 부드러운 가·감속.
 
-      info["wait_time"]   : cur 노드에서 출발 전 신호 대기 (movement-aware)
-      info["abs_depart"]  : cur 출발 절대 시각 (대기 종료 시점)
-      info["movement"]    : straight/left/right/uturn
-      info["fuel_idle"]   : 대기 중 공회전 연료 (이미 fuel_total 포함)
+    신호 준수: env.step() 의 movement-aware 대기를 그대로 신뢰. 모든 agent 가
+    같은 sim_time 진행이므로 신호 phase 도 모두 동일하게 평가됨.
     """
     def __init__(self, name: str, env: RoadNetworkEnv, model,
-                 start: str, goal: str, start_hour: float,
-                 frames_per_link: int):
-        self.name            = name
-        self.env             = env
-        self.model           = model
-        self.frames_per_link = frames_per_link
+                 start: str, goal: str, start_hour: float):
+        self.name  = name
+        self.env   = env
+        self.model = model
 
         self.done    = False
         self.reached = False
 
-        self.step_count  = 0
-        self.speed_kmh   = 0.0
-        self.cum_fuel    = 0.0
-        self.cum_time    = 0.0
-        self.cum_wait    = 0.0
-        self.cum_dist    = 0.0
-        self.last_reward = 0.0
+        # 누적 지표 (cum_time = 자기 시뮬 시간, sim_time 과 다를 수 있음:
+        # link 진행 중에는 sim_time 이 더 앞서 있을 수 있음. 대시보드에는
+        # global sim_time 을 표시하므로 cum_time 은 디버그용)
+        self.step_count = 0
+        self.cum_fuel   = 0.0
+        self.cum_wait   = 0.0
+        self.cum_dist   = 0.0
 
-        # 실시간 그래프용 히스토리
-        self._step_hist: list[int]   = [0]
-        self._fuel_hist: list[float] = [0.0]
-        self._wait_hist: list[float] = [0.0]
-
-        # 영구 경로 기록 (방문 노드 순서)
+        # 영구 경로
         self._path_nodes: list[str] = [start]
 
-        # 신호 색상 보간용 (각 모델 고유 시각)
-        self._abs_t_wait_start: float = float(env.start_time_sec)
-        self._abs_t_depart:     float = float(env.start_time_sec)
-        self._wait_seconds:     float = 0.0
-        self._link_travel_time: float = 30.0
+        # 현재 link 진행 상태
+        self._link_sim_start = 0.0          # 이 link 가 sim_time 어디서 시작했는가
+        self._link_t_wait    = 0.0          # 출발 신호 대기 (s)
+        self._link_t_travel  = 0.0          # 링크 주행 시간 (s)
+        self._link_total     = 0.0          # = t_wait + t_travel
+        self._link_v_cruise  = 0.0          # 표시용 (km/h)
+        self._link_fuel      = 0.0          # 이 link 의 총 연료 (mL)
+        self._link_dist      = 0.0
+        self._pos_from = [0.0, 0.0]
+        self._pos_to   = [0.0, 0.0]
 
-        # 애니메이션 내부 상태
-        self._mode        = "idle"
-        self._t           = 0.0
-        self._pos_from    = [0.0, 0.0]
-        self._pos_to      = [0.0, 0.0]
-        self._wait_frames = 0
-        self._wait_idx    = 0
-        self._sim_done    = False
+        # 시뮬 현재 위치·모드 (advance_to 가 갱신)
+        self.pos       = [0.0, 0.0]
+        self._mode     = "idle"             # waiting / traveling / done
+        self.speed_kmh = 0.0                # 현재 순간 속도 (운동학)
+
+        self._sim_done = False
 
         self.state = env.reset(start_node=start, goal_nodes=[goal],
                                start_hour=start_hour)
-        self._pos_to = list(env.nodes[start]["pos"])
-        self._prepare_next()
+        self.pos     = list(env.nodes[start]["pos"])
+        self._pos_to = list(self.pos)
+        # 첫 link 준비 (sim_time=0 기준)
+        self._prepare_next(sim_time=0.0)
 
-    # ── 모델의 현재 시뮬레이션 시각 (시각화 신호 색상 보간용) ───────────────
-    def current_abs_t(self) -> float:
-        """현재 모드에 따른 wall-clock 절대 시각."""
+    # ── 시각화 보조 ──────────────────────────────────────────────────────────
+    def focus_node_id(self) -> str | None:
+        """wedge 표시 대상 노드 (waiting=현재, traveling=다음 도착)."""
         if self._mode == "waiting":
-            # 대기 중: cur 노드에서 멈춰있음. 신호 색상은 시간 흐름에 따라 변화.
-            frac = self._wait_idx / max(self._wait_frames, 1)
-            return self._abs_t_wait_start + frac * self._wait_seconds
+            if len(self._path_nodes) >= 2:
+                return self._path_nodes[-2]
+            return self._path_nodes[-1] if self._path_nodes else None
         if self._mode == "traveling":
-            return self._abs_t_depart + self._t * self._link_travel_time
-        return self.env.start_time_sec + self.env.current_time
+            return self._path_nodes[-1] if self._path_nodes else None
+        return None
 
-    # ── 다음 스텝 준비 ────────────────────────────────────────────────────────
-    def _prepare_next(self):
+    def current_abs_t(self) -> float:
+        """env wall-clock (신호 phase 평가용). env.current_time 이 이미 sim_time
+        과 동기되어 진행되므로 link 안 미세 보간만 추가."""
+        base = self.env.start_time_sec + self.env.current_time
+        # env.current_time 은 step 완료 시점 기준 → 진행 중 link 의 sub-frame 분 보정
+        # 단순화: sim_time 진행분을 그대로 더해줘도 OK 하지만 env.current_time 이
+        # 이미 t_wait+t_travel 을 포함하므로 base 가 link 끝 시각. waiting/traveling
+        # 중에는 base 에서 (link_total - elapsed) 만큼 뺀 것이 현재 wall-clock.
+        return base - max(0.0, self._link_total - (self._sim_now - self._link_sim_start))
+
+    # ── 다음 link 준비 ───────────────────────────────────────────────────────
+    def _prepare_next(self, sim_time: float):
+        self._sim_now = sim_time
         if self._sim_done:
             self._mode = "done"
             self.done  = True
+            self.pos   = list(self._pos_to)
             return
 
         valid = self.env.get_valid_actions()
@@ -223,94 +255,109 @@ class _AgentState:
         from_node      = self.env.current_node
         self._pos_from = list(self.env.nodes[from_node]["pos"])
 
-        # 신호 대기 시작 시각 (= cur 도착 시각 = 출발 직전 wall-clock)
-        self._abs_t_wait_start = self.env.start_time_sec + self.env.current_time
-
         action = self.model.act(self.state, valid)
         self.state, reward, done_flag, info = self.env.step(action)
 
         to_node      = self.env.current_node
         self._pos_to = list(self.env.nodes[to_node]["pos"])
 
-        wt          = info.get("wait_time",  0.0)
-        t_travel    = info.get("travel_time", 0.0)
-        fuel_total  = info.get("fuel_total",  0.0)
-        movement    = info.get("movement",   "straight")
-        abs_depart  = info.get("abs_depart",
-                               self._abs_t_wait_start + wt)
+        wt        = info.get("wait_time",   0.0)
+        t_travel  = info.get("travel_time", 0.0)
+        fuel_tot  = info.get("fuel_total",  0.0)
+        movement  = info.get("movement",    "straight")
 
-        # ── 지표 갱신 ────────────────────────────────────────────────────────
-        self.speed_kmh   = info.get("speed_kmh",  0.0)
-        self.cum_fuel   += fuel_total            # fuel_idle 이미 포함
-        self.cum_time   += wt + t_travel
-        self.cum_wait   += wt
-        self.cum_dist   += info.get("distance", 0.0)
-        self.last_reward = reward
+        # link 기록
+        self._link_sim_start = sim_time
+        self._link_t_wait    = wt
+        self._link_t_travel  = max(t_travel, 0.01)
+        self._link_total     = wt + self._link_t_travel
+        self._link_v_cruise  = info.get("speed_kmh", 0.0)
+        self._link_fuel      = fuel_tot
+        self._link_dist      = info.get("distance", 0.0)
+
+        # 누적 지표
+        self.cum_fuel  += fuel_tot
+        self.cum_wait  += wt
+        self.cum_dist  += self._link_dist
         self.step_count += 1
-        self.reached     = info.get("reached_goal", False)
+        self.reached    = info.get("reached_goal", False)
 
         self._path_nodes.append(to_node)
-        self._step_hist.append(self.step_count)
-        self._fuel_hist.append(self.cum_fuel)
-        self._wait_hist.append(self.cum_wait)
 
-        # 시각화용 시각 기록
-        self._wait_seconds     = wt
-        self._abs_t_depart     = abs_depart
-        self._link_travel_time = max(t_travel, 0.01)
+        self._mode = "waiting" if wt > 0 else "traveling"
+        self.pos   = list(self._pos_from)
+        self.speed_kmh = 0.0 if wt > 0 else self._link_v_cruise
 
         if wt > 0:
             phase = _signal_phase_at(self.env.nodes[from_node],
-                                     self._abs_t_wait_start)
+                                     self.env.start_time_sec + self.env.current_time - wt - t_travel)
             print(f"  [{self.name}] 스텝{self.step_count}: "
                   f"{from_node}({phase}) 에서 {movement} 위해 {wt:.1f}s 대기")
-
-        # ── 애니메이션 파라미터 ───────────────────────────────────────────────
-        self._t = 0.0
-        # 대기 프레임: 실제 대기 시간에 비례하되 최소 10, 최대 60 프레임 확보
-        self._wait_frames = (max(10, min(MAX_WAIT_FRAMES, int(wt * 0.6)))
-                             if wt > 0 else 0)
-        self._wait_idx = 0
-        # 대기 먼저 → 그 다음 주행 (Driver는 출발 신호 대기 후 진행)
-        self._mode = "waiting" if self._wait_frames > 0 else "traveling"
 
         if done_flag:
             self._sim_done = True
 
-    # ── 프레임 1회 진행 → 현재 위치 반환 ─────────────────────────────────────
-    def advance_frame(self) -> list[float]:
+    # ── Global sim_time 으로 자기 상태 갱신 ──────────────────────────────────
+    def advance_to(self, sim_time: float):
+        """
+        sim_time 시점에서의 위치·모드 갱신.
+        sim_time 이 현재 link 의 끝(_link_sim_start + _link_total)을 넘으면
+        다음 link 로 자동 진입 (한 frame 내 여러 link 통과 가능).
+        """
         if self._mode == "done":
-            return list(self._pos_to)
+            return
+        self._sim_now = sim_time
 
-        # 출발 대기: cur 노드에서 멈춤 (신호 phase 도달까지)
-        if self._mode == "waiting":
-            self._wait_idx += 1
-            if self._wait_idx >= self._wait_frames:
-                self._mode = "traveling"
-                self._t    = 0.0
-            return list(self._pos_from)
+        # 현재 link 가 이미 끝났으면 다음 link 들로 진행 (반복)
+        while not self._sim_done and sim_time >= self._link_sim_start + self._link_total - 1e-9:
+            # 이 link 의 누적 시간 = self._link_sim_start + self._link_total
+            # 다음 link 는 그 시점부터 시작
+            next_start = self._link_sim_start + self._link_total
+            self._prepare_next(next_start)
+            if self._mode == "done":
+                return
 
-        # 주행
-        if self._mode == "traveling":
-            self._t += 1.0 / self.frames_per_link
-
-            if self._t >= 1.0:
-                end_pos = list(self._pos_to)
-                # 도착 즉시 다음 step 준비 (다음 step의 출발 대기 또는 주행)
-                self._prepare_next()
-                return end_pos
-
-            # 진행 곡선:
-            #   다음 step에 출발 대기 예정인지 알 수 없으므로 등속 처리.
-            #   (이전에는 도착 후 대기 모델이라 끝에서 감속했으나, 새 구조는
-            #    출발 시 대기이므로 도착 직후 즉시 다음 _prepare_next 가 결정)
-            t = self._t
-            return [
-                self._pos_from[0] + (self._pos_to[0] - self._pos_from[0]) * t,
-                self._pos_from[1] + (self._pos_to[1] - self._pos_from[1]) * t,
+        local_t = sim_time - self._link_sim_start  # 0 ~ _link_total
+        if local_t < self._link_t_wait:
+            # 출발 대기
+            self._mode = "waiting"
+            self.pos   = list(self._pos_from)
+            self.speed_kmh = 0.0
+        else:
+            # 주행
+            self._mode = "traveling"
+            t_in_travel = local_t - self._link_t_wait
+            r = min(1.0, max(0.0, t_in_travel / max(self._link_t_travel, 1e-6)))
+            ease = r * r * (3.0 - 2.0 * r)   # smoothstep ease-in-out
+            self.pos = [
+                self._pos_from[0] + (self._pos_to[0] - self._pos_from[0]) * ease,
+                self._pos_from[1] + (self._pos_to[1] - self._pos_from[1]) * ease,
             ]
+            # 순간 속도 ≈ ease 미분 × 평균속도. smoothstep' = 6r(1-r), max=1.5 at r=0.5
+            ease_prime = 6.0 * r * (1.0 - r)
+            self.speed_kmh = self._link_v_cruise * ease_prime / 1.5
+            # 종착 근접 → 도착 마지막 미세 정착
+            if r >= 1.0 - 1e-6:
+                self.pos = list(self._pos_to)
+                self.speed_kmh = self._link_v_cruise
 
-        return list(self._pos_from)
+    # ── 현재 표시용 연료 (실시간 누적: 이전 link 까지 + 현재 link 진행 비율) ──
+    def fuel_realtime(self) -> float:
+        if self._mode == "done":
+            return self.cum_fuel
+        # 이미 cum_fuel 에 현재 link 의 전체 연료가 더해져 있음 → 진행 비율로 빼주기
+        if self._link_total <= 0:
+            return self.cum_fuel
+        local_t = max(0.0, self._sim_now - self._link_sim_start)
+        progress = min(1.0, local_t / self._link_total)
+        return (self.cum_fuel - self._link_fuel) + self._link_fuel * progress
+
+    def wait_realtime(self) -> float:
+        if self._mode == "done":
+            return self.cum_wait
+        local_t = max(0.0, self._sim_now - self._link_sim_start)
+        wait_progress = min(local_t, self._link_t_wait)
+        return (self.cum_wait - self._link_t_wait) + wait_progress
 
 
 # ── 시뮬레이터 ────────────────────────────────────────────────────────────────
@@ -318,7 +365,7 @@ class Simulator:
     def __init__(self, cfg_path: str, model_names: list[str],
                  route_name: str, time_slot: str, speed_mult: int = 1,
                  gif_path: str | None = None):
-        self.cfg = yaml.safe_load(open(cfg_path, encoding="utf-8", encoding="utf-8"))
+        self.cfg = yaml.safe_load(open(cfg_path, encoding="utf-8"))
         routes   = {r["name"]: r for r in self.cfg["experiments"]["routes"]}
         tslots   = {t["label"]: t for t in self.cfg["experiments"]["time_slots"]}
         route    = routes[route_name]
@@ -337,6 +384,9 @@ class Simulator:
         # speed_mult: 1배속=BASE_FRAMES_PER_LINK, N배속=//N
         self.frames_per_link = max(5, BASE_FRAMES_PER_LINK // speed_mult)
 
+        # 속도 노이즈는 ±20% 가우시안 그대로 (학습/평가와 동일). 시간 동기화는
+        # global sim_time + advance_to() 로 보장 — 모든 agent 가 같은 sim_time
+        # 진행에 따라 자기 위치 갱신.
         self.agents: list[_AgentState] = []
         for name in model_names:
             env = RoadNetworkEnv(
@@ -346,10 +396,16 @@ class Simulator:
             model = _load_model(name, self.cfg, env)
             self.agents.append(
                 _AgentState(name, env, model, self.start, self.goal,
-                            self.start_hour, self.frames_per_link)
+                            self.start_hour)
             )
 
         self.ref_env = self.agents[0].env
+
+        # Global wall-clock — 1배속에서 frame 당 sim_dt = 0.5초.
+        # speed_mult N → sim_dt = 0.5 * N. (예: link 30s = 60/N frames at 30fps)
+        self.sim_time = 0.0
+        self.sim_dt   = 0.5 * speed_mult
+
         self._build_figure()
 
     # ── 그림 뼈대 ────────────────────────────────────────────────────────────
@@ -444,6 +500,7 @@ class Simulator:
             })
 
     def _update_info_cards(self):
+        """매 frame 호출. 시간=global sim_time(모든 모델 동일), 나머지=agent별 실시간."""
         for texts, ag in zip(self._card_texts, self.agents):
             if ag.reached:
                 texts["status"].set_text("도달 완료 ✓")
@@ -458,13 +515,22 @@ class Simulator:
                 texts["status"].set_text("주행 중 ▶")
                 texts["status"].set_color("#d07010")
 
-            texts["fuel"].set_text(f"{ag.cum_fuel:.1f} mL")
-            texts["time"].set_text(f"{ag.cum_time:.1f} s")
+            # 연료/속도는 link 진행 비율로 실시간 보간 → 매 frame 매끄럽게 갱신
+            texts["fuel"].set_text(f"{ag.fuel_realtime():.1f} mL")
+            texts["time"].set_text(f"{self.sim_time:.1f} s")
             texts["speed"].set_text(f"{ag.speed_kmh:.1f} km/h")
             texts["step"].set_text(str(ag.step_count))
 
     # ── 실시간 그래프 초기화 ────────────────────────────────────────────────
     def _init_graphs(self):
+        # 그래프용 시계열 — sim_time 축, 매 frame 한 점씩 추가
+        self._series_t:    list[float]         = []
+        self._series_fuel: dict[str, list[float]] = {}
+        self._series_wait: dict[str, list[float]] = {}
+        for ag in self.agents:
+            self._series_fuel[ag.name] = []
+            self._series_wait[ag.name] = []
+
         for ax, title in [(self.fuel_ax, "누적 연료 (mL)"),
                           (self.wait_ax, "누적 대기시간 (s)")]:
             ax.set_facecolor(BG_CARD)
@@ -473,6 +539,7 @@ class Simulator:
                 sp.set_linewidth(0.8)
             ax.tick_params(colors=TEXT_LITE, labelsize=7)
             ax.set_title(title, fontsize=8, color=TEXT_MID, pad=3)
+            ax.set_xlabel("sim time (s)", fontsize=7, color=TEXT_LITE)
             ax.grid(True, alpha=0.25, color=GRID_CLR)
 
         self.fuel_lines: dict[str, plt.Line2D] = {}
@@ -493,13 +560,18 @@ class Simulator:
                             edgecolor=GRID_CLR, loc="upper left", borderpad=0.5)
 
     def _update_graphs(self):
-        has_data = False
+        """매 frame 호출. x축 = sim_time(초), y축 = 실시간 누적치.
+        autoscale 은 5 frame 마다 (성능 최적화)."""
+        self._series_t.append(self.sim_time)
         for ag in self.agents:
-            if len(ag._step_hist) > 1:
-                self.fuel_lines[ag.name].set_data(ag._step_hist, ag._fuel_hist)
-                self.wait_lines[ag.name].set_data(ag._step_hist, ag._wait_hist)
-                has_data = True
-        if has_data:
+            self._series_fuel[ag.name].append(ag.fuel_realtime())
+            self._series_wait[ag.name].append(ag.wait_realtime())
+        for ag in self.agents:
+            self.fuel_lines[ag.name].set_data(
+                self._series_t, self._series_fuel[ag.name])
+            self.wait_lines[ag.name].set_data(
+                self._series_t, self._series_wait[ag.name])
+        if self._fc % 5 == 0:
             for ax in (self.fuel_ax, self.wait_ax):
                 ax.relim()
                 ax.autoscale_view()
@@ -600,24 +672,36 @@ class Simulator:
             self.path_bg.append(bg)
             self.path_fg.append(fg)
 
-        # 에이전트 마커 + 신호 대기 링
-        self.agent_dots:  list[plt.Line2D] = []
-        self.wait_rings:  list[plt.Circle] = []
-        # 대기 링 반경: 노드 간 평균 거리에 기반
-        ring_base = max(env.map_diag / 60.0, 12.0)
-        self._ring_base = ring_base
-        for ag in self.agents:
+        # 에이전트 마커 + 신호 phase wedge
+        # wedge 는 12시 시작·시계방향 줄어드는 호로 phase 잔여시간 표시.
+        # waiting 모드: 현재 노드의 신호 phase wedge
+        # traveling 모드: 다음 노드(action)의 신호 phase wedge — 다음 노드 무신호면 숨김
+        # 5 agents 동시 → radius offset 으로 동심원 형태 (겹침 방지)
+        self.agent_dots:    list[plt.Line2D]     = []
+        self.signal_wedges: list[mpatches.Wedge] = []
+        ring_base = max(env.map_diag / 60.0, 14.0)
+        self._ring_base   = ring_base
+        self._ring_offset = max(env.map_diag / 200.0, 4.0)  # agent 간 동심원 간격
+        wedge_lw = max(2.0, vp["density_scale"] * 3.5)
+        for i, ag in enumerate(self.agents):
             color = MODEL_META[ag.name]["color"]
             dot, = ax.plot([], [], "o", color=color,
                            ms=vp["agent_ms"], zorder=8,
                            markeredgecolor="white",
                            markeredgewidth=max(0.8, vp["density_scale"] * 1.5))
-            ring = plt.Circle((0, 0), 0, color="#e03535",
-                              fill=False, lw=max(1.0, vp["density_scale"] * 2.5),
-                              alpha=0, zorder=9)
-            ax.add_patch(ring)
+            # 도넛 형 호 (width=두께). 색은 phase 에 따라 set_facecolor 로 매 frame 갱신
+            wedge = mpatches.Wedge(
+                center=(0, 0),
+                r=ring_base + i * self._ring_offset,
+                theta1=90, theta2=90,    # 시작은 0 도 (보이지 않음)
+                width=max(2.5, ring_base * 0.18),
+                facecolor="#e03535", edgecolor="white",
+                linewidth=max(0.5, vp["density_scale"]),
+                alpha=0, zorder=9,
+            )
+            ax.add_patch(wedge)
             self.agent_dots.append(dot)
-            self.wait_rings.append(ring)
+            self.signal_wedges.append(wedge)
 
         # 신호 범례 (좌하단)
         sig_handles = [
@@ -659,28 +743,28 @@ class Simulator:
     def _update_map(self):
         env = self.ref_env
 
-        # 화면 전역 신호 색: 활성(미완료) 에이전트들의 시각 평균
-        # (단일 ag0 기준은 모델 간 시각 어긋남으로 색-동작 불일치 발생)
-        active_ts = [ag.current_abs_t() for ag in self.agents if not ag.done]
-        if active_ts:
-            abs_t = sum(active_ts) / len(active_ts)
-        else:
-            abs_t = env.start_time_sec + max(
-                (ag.cum_time for ag in self.agents), default=0.0
-            )
+        # 모든 agent 가 같은 sim_time 으로 진행 → 모두 같은 wall-clock 공유
+        sim_t = self.sim_time
+        for ag in self.agents:
+            ag.advance_to(sim_t)
 
-        # 신호 노드 색상 업데이트
-        if self.scatter_signal is not None:
-            self.scatter_signal.set_color(
-                [_signal_color(env.nodes[n], abs_t) for n in self._node_signal]
-            )
-        if self.scatter_left is not None:
-            self.scatter_left.set_color(
-                [_signal_color(env.nodes[n], abs_t) for n in self._node_left_turn]
-            )
+        # 전역 신호 색 평가 시각: env.start_time_sec + sim_time
+        abs_t = env.start_time_sec + sim_t
+
+        # 신호 노드 색상 업데이트 — phase 는 수십 초 단위 변경이므로 매 3 frame
+        # 마다만 redraw (60fps × 1초 = 60 frame, 3 frame = 50ms 간격으로 충분)
+        if self._fc % 3 == 0:
+            if self.scatter_signal is not None:
+                self.scatter_signal.set_color(
+                    [_signal_color(env.nodes[n], abs_t) for n in self._node_signal]
+                )
+            if self.scatter_left is not None:
+                self.scatter_left.set_color(
+                    [_signal_color(env.nodes[n], abs_t) for n in self._node_left_turn]
+                )
 
         for i, ag in enumerate(self.agents):
-            pos = ag.advance_frame()
+            pos = ag.pos
 
             # 에이전트 마커
             self.agent_dots[i].set_data([pos[0]], [pos[1]])
@@ -692,19 +776,30 @@ class Simulator:
             self.path_bg[i].set_data(pxs, pys)
             self.path_fg[i].set_data(pxs, pys)
 
-            # 신호 대기 링 (pulse) — 맵 크기에 비례한 반경
-            ring = self.wait_rings[i]
-            if ag._mode == "waiting":
-                pulse = 0.7 + 0.3 * abs(math.sin(self._fc * 0.22))
-                ring.set_center(tuple(pos))
-                ring.set_radius(self._ring_base * pulse)
-                ring.set_alpha(0.85)
+            # 신호 phase wedge — 모든 모델이 같은 sim_time 의 같은 phase 평가
+            wedge = self.signal_wedges[i]
+            focus_id = ag.focus_node_id()
+            phase_state = (_node_phase_state(env.nodes[focus_id], abs_t)
+                           if focus_id is not None else None)
+            if phase_state is None:
+                wedge.set_alpha(0)
             else:
-                ring.set_alpha(0)
+                ph_type, remain_r, color = phase_state
+                target_pos = (env.nodes[focus_id]["pos"]
+                              if ag._mode == "traveling"
+                              else pos)
+                wedge.set_center(tuple(target_pos))
+                wedge.set_theta1(90.0 - 360.0 * remain_r)
+                wedge.set_theta2(90.0)
+                wedge.set_facecolor(color)
+                wedge.set_alpha(0.85 if ag._mode == "waiting" else 0.72)
 
     # ── 애니메이션 프레임 ─────────────────────────────────────────────────────
     def _animate(self, frame: int):
         self._fc = frame
+        # Global wall-clock 진행: 매 frame 마다 sim_dt 초 더하기
+        # (1배속 sim_dt=0.5s; speed_mult N 일 때 0.5×N)
+        self.sim_time += self.sim_dt
         self._update_map()
         self._update_info_cards()
         self._update_graphs()
@@ -749,6 +844,7 @@ class Simulator:
         frame_idx = 0
         while not all(ag.done for ag in self.agents):
             self._fc = frame_idx
+            self.sim_time += self.sim_dt
             self._update_map()
             self._update_info_cards()
             self._update_graphs()

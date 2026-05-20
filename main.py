@@ -25,34 +25,32 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 
 def step_data(cfg: dict):
+    """
+    config.data.topology 경로명으로 환경 자동 분기.
+      data/6x6_cross_* → util.generate_data_cross  (사선 토폴로지, 속도 재사용)
+      data/6x6_*       → util.generate_data_6x6    (격자 테스트베드)
+      data/10x10_*     → util.generate_data        (옛 10x10, 호환 유지)
+      data/gangnam* / 그 외 → 외부 데이터 가정, 생성 스킵
+    routes는 config.yaml에서 사용자가 직접 관리 (자동 덮어쓰기 안 함).
+    """
     print("\n[1/4] 데이터 생성")
-    from util.generate_data import generate_topology, generate_speed_csv
-    topo = generate_topology(cfg["data"]["topology"])
+    topo_path = cfg["data"]["topology"]
+    name = Path(topo_path).name.lower()
+    if name.startswith("6x6_cross"):
+        # 사선 토폴로지 — 속도 CSV 는 6x6 격자와 link_id 호환되어 재사용
+        from util.generate_data_cross import generate_topology
+        generate_topology(topo_path)
+        print(f"  [info] 속도 파일은 재생성 없이 재사용: {cfg['data']['speed']}")
+        return
+    if name.startswith("6x6"):
+        from util.generate_data_6x6 import generate_topology, generate_speed_csv
+    elif name.startswith("10x10"):
+        from util.generate_data import generate_topology, generate_speed_csv
+    else:
+        print(f"  [skip] {topo_path} 는 외부 데이터 — 생성 안 함")
+        return
+    topo = generate_topology(topo_path)
     generate_speed_csv(topo, cfg["data"]["speed"])
-
-    # config의 routes PLACEHOLDER를 실제 노드 ID로 자동 업데이트
-    import json, math
-    with open(cfg["data"]["topology"]) as f:
-        t = json.load(f)
-    meta = t["metadata"]
-    grid = meta["grid_size"]
-    nodes_sorted = sorted(t["nodes"], key=lambda n: n["id"])
-
-    # 단거리: (0,0)→(1,2), (2,0)→(0,2)
-    # 장거리: (0,0)→(9,9), (0,9)→(9,0)
-    def nid(r, c):
-        return str(100101 + r * grid + c)
-
-    routes_update = [
-        {"name":"short_01","start":nid(0,0),"goal":nid(1,2),"type":"short"},
-        {"name":"short_02","start":nid(2,0),"goal":nid(0,2),"type":"short"},
-        {"name":"long_01", "start":nid(0,0),"goal":nid(9,9),"type":"long"},
-        {"name":"long_02", "start":nid(0,9),"goal":nid(9,0),"type":"long"},
-    ]
-    cfg["experiments"]["routes"] = routes_update
-    with open("config/config.yaml", "w") as f:
-        yaml.dump(cfg, f, allow_unicode=True, default_flow_style=False)
-    print("  config.yaml routes 자동 업데이트 완료.")
 
 
 def step_train(cfg: dict, models: list[str] | None = None):
@@ -141,7 +139,7 @@ def main():
     parser.add_argument("--config", default="config/config.yaml")
     args = parser.parse_args()
 
-    cfg = yaml.safe_load(open(args.config, encoding="utf-8", encoding="utf-8"))
+    cfg = yaml.safe_load(open(args.config, encoding="utf-8"))
 
     steps = {
         "data":       [step_data],
