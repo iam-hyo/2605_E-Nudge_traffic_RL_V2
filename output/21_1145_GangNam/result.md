@@ -168,4 +168,25 @@ python experiments/run_experiment.py   # → output/{DD_HHMM}/results.csv, summa
 
 ---
 
-*결과 파일: `output/21_1145/results.csv`, `summary.json`*
+## 7. 시각화
+
+5개 모델 동시 비교 시뮬레이션을 GIF로 렌더링:
+`output/21_1145_GangNam/compare_all5_gangnam_main_peak.gif` (헤드리스 4배속,
+851프레임). 출발(녹색★)·목표(주황★)와 1995노드 도로망, 신호 phase(녹/적)가
+함께 표시된다. 모든 에이전트 경로가 출발점 부근에 머물러 목표에 닿지 못함이
+시각적으로 확인된다 — static_fuel은 출발부 인근 순환, 나머지는 8~14스텝 내 정지.
+
+```bash
+python simulation.py --models all --route gangnam_main --time_slot peak --speed 4 --gif_only
+```
+
+> 비고: `simulation.py`의 신호 wedge 반지름이 절대 하한(14.0 좌표단위)에 묶여,
+> 위경도 좌표(map_diag≈0.13)인 강남구에서 지도의 약 100배 크기로 그려져
+> 도로망이 화면 밖으로 밀려나는 버그가 있었다. wedge 기하를 map_diag 비례로,
+> 지도 축범위를 노드 좌표 경계로 명시 설정하도록 수정(격자 토폴로지 영향 없음).
+> `--route` 선택지도 config.yaml routes 에서 동적으로 읽도록 수정.
+
+---
+
+*결과 파일: `output/21_1145_GangNam/results.csv`, `summary.json`,
+`compare_all5_gangnam_main_peak.gif`*
