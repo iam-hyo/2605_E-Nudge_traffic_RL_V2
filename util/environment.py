@@ -396,6 +396,7 @@ class RoadNetworkEnv:
         self.start_time_sec = int((start_hour or self.default_start_hour) * 3600)
         self.current_time  = 0.0
         self.steps         = 0
+        self._last_link_speed_ms = None   # 직진 시 이어받을 직전 링크 순항속도
         self._goal_center  = self._calc_goal_center()
         return self._get_state()
 
@@ -470,20 +471,27 @@ class RoadNetworkEnv:
         lk    = self.links[link_id]
         v_ms  = self._get_link_speed_ms(link_id, abs_depart)
 
-        # 진출 목표 속도: action 노드 신호 종류에 따라 회전 감속
-        next_sig = self.nodes[action].get("signal")
-        next_has_lt = next_sig and any(_phase_category(p["type"]) == "left"
-                                       for p in next_sig["phases"])
-        v_exit = (V_TURN_LEFT if next_has_lt
-                  else V_TURN_RIGHT if next_sig is not None
-                  else v_ms)
+        # 진입 속도 — 드라이버 운동 모델 (2026-05-21 개정):
+        #   · 좌/우회전 → 회전 감속 유지 (회전 속도로 진입 후 가속)
+        #   · 직진      → 노드에서의 명시적 감속 없음. 직전 링크 순항속도를
+        #                 이어받아 링크 간 속도 차이만큼만 가·감속.
+        if movement == "left":
+            v_entry = min(V_TURN_LEFT, v_ms)
+        elif movement == "right":
+            v_entry = min(V_TURN_RIGHT, v_ms)
+        else:                                   # straight / uturn / 에피소드 시작
+            v_entry = (self._last_link_speed_ms
+                       if self._last_link_speed_ms is not None else v_ms)
 
+        # 진출 속도 — 다음 회전은 미지이므로 명시적 노드 감속 없이 순항속도를
+        # 유지한다. 다음 회전의 감속은 다음 링크의 v_entry 로 반영된다.
         profile  = SpeedProfile(
             v_cruise = v_ms,
-            v_entry  = v_ms * 0.7,
-            v_exit   = min(v_exit, v_ms),
+            v_entry  = v_entry,
+            v_exit   = v_ms,
             link_len = lk["len"],
         )
+        self._last_link_speed_ms = v_ms          # 다음 직진 링크가 이어받을 속도
         t_travel = profile.total_time()
 
         # 연료 — VT-Micro 출력 L/s → mL 환산 (보상 스케일 정합)

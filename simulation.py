@@ -72,6 +72,8 @@ MAX_WAIT_FRAMES      = 60   # 신호 대기 최대 프레임 수 (1배속 기준
 BG_FIGURE = "#f4f6fb"
 BG_CARD   = "#ffffff"
 BG_HDR    = "#f0f2f8"
+BG_HDR_REACHED = "#cdeed9"   # 도달 완료 — 헤더 초록 강조
+BG_HDR_TIMEOUT = "#f2d4d4"   # 타임아웃 — 헤더 적색 강조
 BG_MAP    = "#eef0f5"
 TEXT_DARK = "#22242a"
 TEXT_MID  = "#555770"
@@ -200,6 +202,7 @@ class _AgentState:
 
         self.done    = False
         self.reached = False
+        self.arrival_time = None      # 목적지 도달(또는 종료) 시각 — 시간 표시 고정용
 
         # 누적 지표 (cum_time = 자기 시뮬 시간, sim_time 과 다를 수 있음:
         # link 진행 중에는 sim_time 이 더 앞서 있을 수 있음. 대시보드에는
@@ -346,6 +349,7 @@ class _AgentState:
             self._mode = "done"
             self.done  = True
             self.pos   = list(self._pos_to)
+            self.speed_kmh = 0.0
             return
 
         local_t = sim_time - self._link_sim_start  # 0 ~ _link_total
@@ -355,19 +359,24 @@ class _AgentState:
             self.pos   = list(self._pos_from)
             self.speed_kmh = 0.0
         else:
-            # 주행
+            # 주행 — 노드에서의 인위적 정지·재가속 제거 (2026-05-21 수정).
+            # 기존 smoothstep(ease-in-out)은 모든 링크 경계에서 속도를 0으로
+            # 만들어, 무신호·녹색 직진에서도 차가 노드마다 멈췄다 출발하는 것처럼
+            # 보였다. 이제 신호 대기(waiting)가 있었던 링크만 정지 상태에서
+            # 부드럽게 가속하고, 그 외에는 등속으로 노드를 통과한다.
             self._mode = "traveling"
             t_in_travel = local_t - self._link_t_wait
             r = min(1.0, max(0.0, t_in_travel / max(self._link_t_travel, 1e-6)))
-            ease = r * r * (3.0 - 2.0 * r)   # smoothstep ease-in-out
+            if self._link_t_wait > 1e-6:
+                frac = r * r                       # 신호 정지 후 출발 — ease-in 가속
+                self.speed_kmh = self._link_v_cruise * min(1.0, 2.0 * r)
+            else:
+                frac = r                           # 무신호·녹색 직진 — 등속 통과
+                self.speed_kmh = self._link_v_cruise
             self.pos = [
-                self._pos_from[0] + (self._pos_to[0] - self._pos_from[0]) * ease,
-                self._pos_from[1] + (self._pos_to[1] - self._pos_from[1]) * ease,
+                self._pos_from[0] + (self._pos_to[0] - self._pos_from[0]) * frac,
+                self._pos_from[1] + (self._pos_to[1] - self._pos_from[1]) * frac,
             ]
-            # 순간 속도 ≈ ease 미분 × 평균속도. smoothstep' = 6r(1-r), max=1.5 at r=0.5
-            ease_prime = 6.0 * r * (1.0 - r)
-            self.speed_kmh = self._link_v_cruise * ease_prime / 1.5
-            # 종착 근접 → 도착 마지막 미세 정착
             if r >= 1.0 - 1e-6:
                 self.pos = list(self._pos_to)
                 self.speed_kmh = self._link_v_cruise
@@ -476,6 +485,7 @@ class Simulator:
     # ── 정보 카드 초기화 ──────────────────────────────────────────────────────
     def _init_info_cards(self):
         self._card_texts: list[dict] = []
+        self._card_headers: list = []
 
         for ax, ag in zip(self.info_axes, self.agents):
             meta  = MODEL_META[ag.name]
@@ -491,11 +501,13 @@ class Simulator:
                 sp.set_edgecolor(color if side == "left" else GRID_CLR)
                 sp.set_linewidth(3.5 if side == "left" else 0.8)
 
-            ax.add_patch(mpatches.FancyBboxPatch(
+            _hdr = mpatches.FancyBboxPatch(
                 (0, 0.78), 1, 0.22, boxstyle="square,pad=0",
                 transform=ax.transAxes,
                 facecolor=BG_HDR, edgecolor="none", clip_on=False,
-            ))
+            )
+            ax.add_patch(_hdr)
+            self._card_headers.append(_hdr)
 
             ax.text(0.07, 0.89, meta["no"], transform=ax.transAxes,
                     va="center", ha="left", fontsize=12,
@@ -531,14 +543,23 @@ class Simulator:
             })
 
     def _update_info_cards(self):
-        """매 frame 호출. 시간=global sim_time(모든 모델 동일), 나머지=agent별 실시간."""
-        for texts, ag in zip(self._card_texts, self.agents):
-            if ag.reached:
-                texts["status"].set_text("도달 완료 ✓")
-                texts["status"].set_color("#16a858")
-            elif ag.done:
-                texts["status"].set_text("타임아웃 ✗")
-                texts["status"].set_color("#c83030")
+        """매 frame 호출. 도달·종료한 agent 는 그 시점에서 시간·헤더를 고정한다."""
+        for i, (texts, ag) in enumerate(zip(self._card_texts, self.agents)):
+            # 도달/종료 시각 1회 고정 (마지막 링크 종료 시각)
+            if ag.done and ag.arrival_time is None:
+                ag.arrival_time = ag._link_sim_start + ag._link_total
+
+            # 헤더·상태·시간·속도를 모두 done(시각적 주행 완료) 기준으로 일치시켜
+            # 동시에 전환 — 도달 표시와 시간 정지가 어긋나지 않게 한다.
+            if ag.done:
+                if ag.reached:
+                    texts["status"].set_text("도달 완료 ✓")
+                    texts["status"].set_color("#0f7d3f")
+                    self._card_headers[i].set_facecolor(BG_HDR_REACHED)
+                else:
+                    texts["status"].set_text("타임아웃 ✗")
+                    texts["status"].set_color("#c83030")
+                    self._card_headers[i].set_facecolor(BG_HDR_TIMEOUT)
             elif ag._mode == "waiting":
                 texts["status"].set_text("신호 대기 ●")
                 texts["status"].set_color("#e03535")
@@ -546,10 +567,15 @@ class Simulator:
                 texts["status"].set_text("주행 중 ▶")
                 texts["status"].set_color("#d07010")
 
-            # 연료/속도는 link 진행 비율로 실시간 보간 → 매 frame 매끄럽게 갱신
+            # 시간 — 도달·종료한 agent 는 그 시점에서 정지, 진행 중은 global sim_time
+            disp_time = (ag.arrival_time if ag.done and ag.arrival_time is not None
+                         else self.sim_time)
+
+            # 연료/속도는 link 진행 비율로 실시간 보간 → 매 frame 매끄럽게 갱신.
+            # 도달·종료한 agent 는 속도 0 으로 고정(정지 상태).
             texts["fuel"].set_text(f"{ag.fuel_realtime():.1f} mL")
-            texts["time"].set_text(f"{self.sim_time:.1f} s")
-            texts["speed"].set_text(f"{ag.speed_kmh:.1f} km/h")
+            texts["time"].set_text(f"{disp_time:.1f} s")
+            texts["speed"].set_text(f"{0.0 if ag.done else ag.speed_kmh:.1f} km/h")
             texts["step"].set_text(str(ag.step_count))
 
     # ── 실시간 그래프 초기화 ────────────────────────────────────────────────
@@ -955,8 +981,7 @@ def main():
         help=f"모델 선택 (공백 구분 / all=전체)\n선택지: {ALL_MODELS + ['all']}",
     )
     parser.add_argument("--route", default=_route_choices[0],
-                        choices=_route_choices,
-                        help=f"실험 경로 (config.yaml routes 기준)\n선택지: {_route_choices}")
+                        help="실험 경로 — --config 의 experiments.routes 에 정의된 경로 이름")
     parser.add_argument("--time_slot", default="off_peak",
                         choices=["off_peak", "peak"],
                         help="off_peak=07:00 한산, peak=08:00 병목")
