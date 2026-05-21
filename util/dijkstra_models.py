@@ -18,7 +18,8 @@ from typing import Optional
 
 import numpy as np
 
-from util.environment import _movement_type
+from util.environment import (_movement_type, _node_allows_left,
+                               V_TURN_LEFT, V_TURN_RIGHT)
 from util.fuel_calculate import SpeedProfile, fuel_idle
 
 
@@ -139,7 +140,15 @@ class StaticFuelDijkstra(_DijkstraBase):
         abs_depart = abs_sec + t_w
 
         v_ms = self._expected_speed_ms(link_id, abs_depart)
-        prof = SpeedProfile(v_ms, v_entry, v_ms * 0.7, lk["len"])
+        # 드라이버 운동 모델(2026-05-21 개정)과 정합 — 회전 시 회전속도 진입,
+        # 직진 시 직전 링크 순항속도 이어받음, 진출은 순항속도(노드 감속 없음).
+        if movement == "left":
+            v_in = min(V_TURN_LEFT, v_ms)
+        elif movement == "right":
+            v_in = min(V_TURN_RIGHT, v_ms)
+        else:
+            v_in = v_entry
+        prof = SpeedProfile(v_ms, v_in, v_ms, lk["len"])
         t_tr = prof.total_time()
 
         # VT-Micro 출력 L/s → mL 환산 (env.step과 단위 정합)
@@ -165,13 +174,22 @@ class StaticFuelDijkstra(_DijkstraBase):
             f, t, v, u, u_prev = heapq.heappop(pq)
             if f > dist.get(u, (float("inf"),))[0]:
                 continue
+            u_node = self.env.nodes[u]
+            u_left_ok = _node_allows_left(u_node)
             for nb, lid in self.env.adj.get(u, []):
                 if nb == u_prev:        # U턴 방지
                     continue
+                # 좌회전 금지 노드의 좌회전 간선 제외 — env.get_valid_actions 와
+                # 정합. 미반영 시 계산 경로가 실제 통행 불가 간선을 포함해 탈선.
+                if not u_left_ok and u_prev is not None and u_prev != u:
+                    if _movement_type(self.env.nodes[u_prev]["pos"],
+                                      u_node["pos"],
+                                      self.env.nodes[nb]["pos"]) == "left":
+                        continue
                 nf, dt  = self._link_fuel(lid, t, v, src=u, prev=u_prev)
                 total_f = f + nf
                 if total_f < dist.get(nb, (float("inf"),))[0]:
-                    v_out = self._expected_speed_ms(lid, t + dt) * 0.7
+                    v_out = self._expected_speed_ms(lid, t + dt)
                     dist[nb] = (total_f, t + dt, v_out, u)
                     prev[nb] = u
                     heapq.heappush(pq, (total_f, t + dt, v_out, nb, u))

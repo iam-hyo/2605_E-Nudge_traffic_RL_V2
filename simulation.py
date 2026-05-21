@@ -955,8 +955,7 @@ def main():
         help=f"모델 선택 (공백 구분 / all=전체)\n선택지: {ALL_MODELS + ['all']}",
     )
     parser.add_argument("--route", default=_route_choices[0],
-                        choices=_route_choices,
-                        help=f"실험 경로 (config.yaml routes 기준)\n선택지: {_route_choices}")
+                        help="실험 경로 — --config 의 experiments.routes 에 정의된 경로 이름")
     parser.add_argument("--time_slot", default="off_peak",
                         choices=["off_peak", "peak"],
                         help="off_peak=07:00 한산, peak=08:00 병목")
