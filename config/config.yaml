@@ -1,7 +1,7 @@
 data:
   # 주 실험 토폴로지 (run_experiment.py / simulation.py 가 사용)
-  topology: data/6x6_cross_topology.json
-  speed: data/6x6_cross_speed_data.csv
+  topology: data/gangnam_clean_topology.json
+  speed: data/gangnam_clean_speed_data.csv
 experiments:
   models:
     rl_base: true
@@ -29,13 +29,18 @@ experiments:
     name: cross_aux3
     start: '1'
     type: long
+  # ── 강남구 실험 경로 (metadata start/goal, 최단 26링크·5332m) ──
+  - goal: '647033'
+    name: gangnam_main
+    start: '111357'
+    type: long
   time_slots:
   - label: off_peak
     start_hour: 7.0
   - label: peak
     start_hour: 8.0
   # ── 실제 실험 범위 (사용자 지정: 경로 하나 · 피크타임 · 30회) ──
-  experiment_route: cross_main
+  experiment_route: gangnam_main
   experiment_time_slot: peak
 output:
   model_dir: models

@@ -244,6 +244,24 @@ def generate_speed_csv(topo: dict, out_path: str):
             speeds.append(round(max(5.0, v), 2))
         rows.append([lk["id"], *speeds])
 
+    # ── col 1 (n2→n32) 세로도로 속도 평탄화 ────────────────────────────────
+    # col 1 은 "명시적 최단·신호 불리" 이면도로다. 링크별 ±12% jitter 때문에
+    # 일부 구간(예: 20_26)이 코리도 평균보다 과도하게 빨라질 수 있어, col 1
+    # 5개 세로링크를 슬롯별 평균 속도 곡선으로 통일한다 — 어느 구간도 평균치
+    # 에서 크게 벗어나지 않게.  (2026-05-21 수정: "n2>n32 도로 속도 과속" 보정)
+    def _is_col1_vertical(lid: str) -> bool:
+        e1, e2 = lid.split("_")
+        return (int(e1) - 1) % GRID == 1 and (int(e2) - 1) % GRID == 1
+
+    col1_rows = [r for r in rows if _is_col1_vertical(r[0])]
+    if col1_rows:
+        mean = [round(sum(r[s + 1] for r in col1_rows) / len(col1_rows), 2)
+                for s in range(24)]
+        for r in col1_rows:
+            r[1:] = mean
+        print(f"[cross v3] col 1 세로도로 {len(col1_rows)}개 링크 속도 평탄화 "
+              f"(peak {mean[12]:.1f} km/h)")
+
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
     with open(out_path, "w", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
