@@ -122,8 +122,7 @@ def plot_routes(topology_path: str, model_dir: str = "models",
         ("rl_attn",   "attention", env_all,  "model_rl_signal_attention.pth"),
     ]
     for key, mode, env_r, pth_name in rl_cfg:
-        agent = DQNAgent(env_r.action_size, node_list, mode=mode,
-                         epsilon=0.0, epsilon_decay=1.0, lr=tc["lr"])
+        agent = DQNAgent(mode=mode, epsilon=0.0, epsilon_decay=1.0, lr=tc["lr"])
         pth = Path(model_dir) / pth_name
         if pth.exists():
             agent.load(str(pth))

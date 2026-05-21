@@ -71,8 +71,6 @@ def _load_model(name: str, cfg: dict, env: RoadNetworkEnv):
     }
     tc    = cfg["train"]
     agent = DQNAgent(
-        action_size   = env.action_size,
-        node_list     = sorted(env.nodes.keys()),
         mode          = mode_map[name],
         gamma         = tc["gamma"],
         epsilon_min   = tc["epsilon_min"],

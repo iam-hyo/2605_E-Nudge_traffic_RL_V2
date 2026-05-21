@@ -5,6 +5,15 @@ DQNAgent — Double DQN + Dueling + Experience Replay.
 
 모든 RL 모델(base / signal / attention)에서 공통 사용.
 모델 종류는 build_model(mode) 로 주입.
+
+행동 공간 — 엣지-상대적 (edge-relative):
+  모델 출력은 ACTION_DIM(=K_HOP1) 개의 슬롯 Q값. 슬롯 k 는 env.get_valid_actions()
+  (방위순 정렬) 의 k 번째 엣지에 대응한다. 전역 노드 ID/인덱스를 쓰지 않으므로
+  토폴로지가 달라도 동일 모델·동일 가중치가 그대로 동작 → 다중 토폴로지 학습 가능.
+
+  · act()    : 슬롯 Q값 argmax → 해당 엣지의 노드 ID 반환 (외부 인터페이스는 노드 ID 유지)
+  · remember(): 행동을 '슬롯 인덱스'로 저장, next state 의 유효 슬롯 개수도 저장
+  · replay() : 타깃 텐서 shape (B, ACTION_DIM), 슬롯 인덱스에만 타깃 주입
 """
 
 from __future__ import annotations
@@ -19,14 +28,12 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 
-from util.model import build_model
+from util.model import build_model, ACTION_DIM
 
 
 class DQNAgent:
     def __init__(
         self,
-        action_size:    int,
-        node_list:      list[str],
         mode:           str   = "signal",   # 'base' | 'signal' | 'attention'
         gamma:          float = 0.95,
         epsilon:        float = 1.0,
@@ -38,9 +45,7 @@ class DQNAgent:
         target_update:  int   = 15,        # 에피소드 단위
         device:         Optional[str] = None,
     ):
-        self.action_size   = action_size
-        self.node_to_idx   = {n: i for i, n in enumerate(node_list)}
-        self.idx_to_node   = {i: n for i, n in enumerate(node_list)}
+        self.action_dim    = ACTION_DIM
 
         self.gamma         = gamma
         self.epsilon       = epsilon
@@ -53,7 +58,7 @@ class DQNAgent:
             device if device else ("cuda" if torch.cuda.is_available() else "cpu")
         )
 
-        self.model        = build_model(mode, action_size).to(self.device)
+        self.model        = build_model(mode).to(self.device)
         self.target_model = copy.deepcopy(self.model).to(self.device)
         self.optimizer    = optim.Adam(self.model.parameters(), lr=lr)
         self.memory: deque = deque(maxlen=memory_size)
@@ -62,24 +67,34 @@ class DQNAgent:
 
     # ── 행동 선택 ─────────────────────────────────────────────────────────────
     def act(self, state: np.ndarray, valid_actions: list[str]) -> str:
+        """
+        valid_actions : env.get_valid_actions() — 방위순 정렬, len ≤ ACTION_DIM.
+                        슬롯 k ↔ valid_actions[k].
+        반환          : 선택한 엣지의 다음 노드 ID (외부 인터페이스 호환).
+        """
         if not valid_actions:
             raise ValueError("valid_actions is empty")
 
+        n = len(valid_actions)
         if random.random() <= self.epsilon:
             return random.choice(valid_actions)
 
         s = torch.FloatTensor(state).unsqueeze(0).to(self.device)
         with torch.no_grad():
-            q = self.model(s)[0]
+            q = self.model(s)[0]               # (ACTION_DIM,)
 
-        best = max(valid_actions,
-                   key=lambda n: q[self.node_to_idx[n]].item())
-        return best
+        best_slot = int(torch.argmax(q[:n]).item())
+        return valid_actions[best_slot]
 
     # ── 메모리 저장 ───────────────────────────────────────────────────────────
-    def remember(self, state, action, reward, next_state, done,
-                 next_valid: list[str]):
-        self.memory.append((state, action, reward, next_state, done, next_valid))
+    def remember(self, state, action_slot: int, reward, next_state, done,
+                 n_next_valid: int):
+        """
+        action_slot  : 선택한 슬롯 인덱스 (0..ACTION_DIM-1)
+        n_next_valid : next_state 의 유효 슬롯 개수 (= len(next get_valid_actions))
+        """
+        self.memory.append(
+            (state, int(action_slot), reward, next_state, done, int(n_next_valid)))
 
     # ── 학습 ──────────────────────────────────────────────────────────────────
     def replay(self):
@@ -87,33 +102,32 @@ class DQNAgent:
             return None
 
         batch = random.sample(self.memory, self.batch_size)
-        states, actions, rewards, next_states, dones, next_valids = zip(*batch)
+        states, slots, rewards, next_states, dones, n_next_valids = zip(*batch)
 
         S  = torch.FloatTensor(np.array(states)).to(self.device)
         NS = torch.FloatTensor(np.array(next_states)).to(self.device)
         R  = torch.FloatTensor(rewards).to(self.device)
         D  = torch.FloatTensor(dones).to(self.device)
 
-        # Double DQN: online 모델로 행동 선택, target 모델로 값 평가
+        # Double DQN: online 모델로 슬롯 선택, target 모델로 값 평가
         with torch.no_grad():
             online_q_next = self.model(NS)
             target_q_next = self.target_model(NS)
 
-        targets = self.model(S).detach().clone()
+        targets = self.model(S).detach().clone()   # (B, ACTION_DIM)
 
-        for i, (action, nv) in enumerate(zip(actions, next_valids)):
+        for i in range(len(slots)):
             if D[i]:
                 t = R[i]
             else:
-                if nv:
-                    valid_idx   = [self.node_to_idx[n] for n in nv]
-                    best_idx    = valid_idx[
-                        online_q_next[i, valid_idx].argmax().item()
-                    ]
-                    t = R[i] + self.gamma * target_q_next[i, best_idx]
+                n = n_next_valids[i]
+                if n > 0:
+                    # 유효 슬롯 범위 [0, n) 안에서 online argmax → target 값 평가
+                    best_slot = int(online_q_next[i, :n].argmax().item())
+                    t = R[i] + self.gamma * target_q_next[i, best_slot]
                 else:
                     t = R[i]
-            targets[i, self.node_to_idx[action]] = t
+            targets[i, slots[i]] = t
 
         self.optimizer.zero_grad()
         loss = nn.MSELoss()(self.model(S), targets)
