@@ -60,11 +60,8 @@ def _load_model(name: str, cfg: dict, env: RoadNetworkEnv):
         "rl_signal_attention": ("attention", True),
     }
     mode, use_sig = mode_map[name]
-    node_list = sorted(env.nodes.keys())
     tc = cfg["train"]
     agent = DQNAgent(
-        action_size   = env.action_size,
-        node_list     = node_list,
         mode          = mode,
         gamma         = tc["gamma"],
         epsilon_min   = tc["epsilon_min"],
@@ -149,8 +146,8 @@ def run_episode(model, env: RoadNetworkEnv,
 def main(cfg_path: str = "config/config.yaml"):
     cfg = yaml.safe_load(open(cfg_path, encoding="utf-8"))
 
-    # 출력 폴더
-    ts     = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    # 출력 폴더 (DD_HHMM 형식)
+    ts     = datetime.datetime.now().strftime("%d_%H%M")
     outdir = Path(cfg["output"]["result_dir"]) / ts
     outdir.mkdir(parents=True, exist_ok=True)
 
@@ -180,6 +177,16 @@ def main(cfg_path: str = "config/config.yaml"):
     routes    = cfg["experiments"]["routes"]
     time_slots = cfg["experiments"]["time_slots"]
     n_repeat  = cfg["experiments"]["repeat"]
+
+    # 실제 실험 범위 한정 (사용자 지정: 경로 하나 · 특정 시간대만)
+    exp_route = cfg["experiments"].get("experiment_route")
+    exp_ts    = cfg["experiments"].get("experiment_time_slot")
+    if exp_route:
+        routes = [r for r in routes if r["name"] == exp_route] or routes
+    if exp_ts:
+        time_slots = [t for t in time_slots if t["label"] == exp_ts] or time_slots
+    print(f"  실험 범위: route={[r['name'] for r in routes]} "
+          f"time_slot={[t['label'] for t in time_slots]} repeat={n_repeat}")
 
     all_rows = []
     total    = (sum(1 for m in model_names if model_flags.get(m, True))

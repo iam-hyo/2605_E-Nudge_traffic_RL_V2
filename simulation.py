@@ -12,8 +12,31 @@ import argparse, math, sys
 from pathlib import Path
 
 import matplotlib
-matplotlib.rcParams["font.family"] = ["Malgun Gothic", "DejaVu Sans"]
+from matplotlib import font_manager as _fm
+
+
+def _pick_korean_font() -> str | None:
+    """플랫폼별로 사용 가능한 한글 폰트를 골라 반환 (없으면 None).
+    Noto Sans CJK 는 pan-CJK 폰트라 JP face 도 한글 글리프를 동일하게 포함한다."""
+    available = {f.name for f in _fm.fontManager.ttflist}
+    for cand in ("Malgun Gothic",                       # Windows
+                 "AppleGothic", "Apple SD Gothic Neo",  # macOS
+                 "NanumGothic", "NanumBarunGothic",      # Linux (nanum)
+                 "Noto Sans CJK KR", "Noto Sans KR",     # Linux (noto, KR face)
+                 "Noto Sans CJK JP"):                    # Linux (noto, JP face — 한글 포함)
+        if cand in available:
+            return cand
+    return None
+
+
+_KOREAN_FONT = _pick_korean_font()
+matplotlib.rcParams["font.family"] = (
+    [_KOREAN_FONT, "DejaVu Sans"] if _KOREAN_FONT else ["DejaVu Sans"]
+)
 matplotlib.rcParams["axes.unicode_minus"] = False
+if _KOREAN_FONT is None:
+    print("  [경고] 한글 폰트를 찾지 못했습니다 — 텍스트의 한글이 깨질 수 있습니다.",
+          file=sys.stderr)
 # --gif_only 플래그 조기 감지: pyplot import 전에 백엔드 결정
 _GIF_ONLY_MODE = "--gif_only" in sys.argv
 matplotlib.use("Agg" if _GIF_ONLY_MODE else "TkAgg")
@@ -66,8 +89,8 @@ ALL_MODELS = list(MODEL_META.keys())
 
 TIMESLOT_LABEL   = {"off_peak": "07:00 한산", "peak": "08:00 병목"}
 ROUTE_TYPE_LABEL = {
-    "short_01": "단거리 ①", "short_02": "단거리 ②",
-    "long_01":  "장거리 ①", "long_02":  "장거리 ②",
+    "cross_main": "메인 경로", "cross_aux1": "보조 경로 ①",
+    "cross_aux2": "보조 경로 ②", "cross_aux3": "보조 경로 ③",
 }
 
 # 신호 페이즈 색 (yellow → red 처리)
@@ -140,7 +163,6 @@ def _load_model(name: str, cfg: dict, env: RoadNetworkEnv):
                 "rl_signal_attention": "model_rl_signal_attention.pth"}
     tc = cfg["train"]
     agent = DQNAgent(
-        action_size=env.action_size, node_list=sorted(env.nodes.keys()),
         mode=mode_map[name], gamma=tc["gamma"],
         epsilon_min=tc["epsilon_min"], epsilon=tc["epsilon_min"],
         epsilon_decay=1.0, lr=tc["lr"],
@@ -316,6 +338,15 @@ class _AgentState:
             self._prepare_next(next_start)
             if self._mode == "done":
                 return
+
+        # 마지막 link (목표 도착 link) 의 주행까지 모두 끝났으면 종료 처리.
+        # _sim_done 이 set 되면 위 while 이 _prepare_next 를 더 호출하지 않으므로
+        # 여기서 직접 done 으로 전환해 줘야 한다.
+        if self._sim_done and sim_time >= self._link_sim_start + self._link_total - 1e-9:
+            self._mode = "done"
+            self.done  = True
+            self.pos   = list(self._pos_to)
+            return
 
         local_t = sim_time - self._link_sim_start  # 0 ~ _link_total
         if local_t < self._link_t_wait:
@@ -679,9 +710,12 @@ class Simulator:
         # 5 agents 동시 → radius offset 으로 동심원 형태 (겹침 방지)
         self.agent_dots:    list[plt.Line2D]     = []
         self.signal_wedges: list[mpatches.Wedge] = []
-        ring_base = max(env.map_diag / 60.0, 14.0)
+        # 신호 wedge 반지름·간격은 맵 좌표 단위. 절대 하한을 두면 좌표계가
+        # 작은 토폴로지(강남구 위경도, map_diag≈0.13)에서 맵보다 커져 화면을
+        # 가린다 → 항상 map_diag 에 비례시킨다 (격자 토폴로지 영향 없음).
+        ring_base = env.map_diag / 60.0
         self._ring_base   = ring_base
-        self._ring_offset = max(env.map_diag / 200.0, 4.0)  # agent 간 동심원 간격
+        self._ring_offset = env.map_diag / 200.0  # agent 간 동심원 간격
         wedge_lw = max(2.0, vp["density_scale"] * 3.5)
         for i, ag in enumerate(self.agents):
             color = MODEL_META[ag.name]["color"]
@@ -694,7 +728,7 @@ class Simulator:
                 center=(0, 0),
                 r=ring_base + i * self._ring_offset,
                 theta1=90, theta2=90,    # 시작은 0 도 (보이지 않음)
-                width=max(2.5, ring_base * 0.18),
+                width=ring_base * 0.18,
                 facecolor="#e03535", edgecolor="white",
                 linewidth=max(0.5, vp["density_scale"]),
                 alpha=0, zorder=9,
@@ -737,7 +771,13 @@ class Simulator:
             facecolor=BG_CARD, labelcolor=TEXT_DARK, edgecolor=GRID_CLR,
             framealpha=0.95, borderpad=0.8, title="모델", title_fontsize=8,
         )
-        ax.margins(0.06)
+        # 명시적 축 범위 — 노드 좌표 경계 기준. autoscale 에 의존하면 (0,0)
+        # 에 초기화된 신호 wedge patch 가 datalim 을 끌어당겨, 원점에서 먼
+        # 좌표계(강남구 위경도)에서 도로망이 구석으로 밀린다.
+        mx = max(env.map_w, 1e-9) * 0.06
+        my = max(env.map_h, 1e-9) * 0.06
+        ax.set_xlim(env.map_x_min - mx, env.map_x_max + mx)
+        ax.set_ylim(env.map_y_min - my, env.map_y_max + my)
 
     # ── 지도 업데이트 (프레임마다) ────────────────────────────────────────────
     def _update_map(self):
@@ -804,12 +844,12 @@ class Simulator:
         self._update_info_cards()
         self._update_graphs()
 
-        # GIF 프레임 캡처 (PIL 설치된 경우에만)
+        # GIF 프레임 캡처 (PIL 설치된 경우에만).
+        # 디코딩된 이미지 대신 PNG 바이트로 보관 → 메모리 사용량 수십 배 절감.
         if self.gif_path and _PIL_AVAILABLE:
             buf = io.BytesIO()
             self.fig.savefig(buf, format="png", dpi=72)
-            buf.seek(0)
-            self.gif_frames.append(_PILImage.open(buf).copy())
+            self.gif_frames.append(buf.getvalue())
             buf.close()
 
         if all(ag.done for ag in self.agents):
@@ -830,9 +870,13 @@ class Simulator:
         gif_dir = Path(self.gif_path).parent
         gif_dir.mkdir(parents=True, exist_ok=True)
         print(f"\n  [GIF] 저장 중... ({len(self.gif_frames)} 프레임)")
-        self.gif_frames[0].save(
+        # PNG 바이트를 하나씩 lazily 디코딩 (generator) → 저장 시점에도
+        # 한 프레임만 메모리에 올라간다.
+        frames = (_PILImage.open(io.BytesIO(b)) for b in self.gif_frames)
+        first  = next(frames)
+        first.save(
             self.gif_path, save_all=True,
-            append_images=self.gif_frames[1:],
+            append_images=frames,
             duration=self.interval_ms, loop=0, optimize=False,
         )
         print(f"  [GIF] 저장 완료: {self.gif_path}")
@@ -852,8 +896,7 @@ class Simulator:
             if _PIL_AVAILABLE:
                 buf = io.BytesIO()
                 self.fig.savefig(buf, format="png", dpi=72)
-                buf.seek(0)
-                self.gif_frames.append(_PILImage.open(buf).copy())
+                self.gif_frames.append(buf.getvalue())
                 buf.close()
 
             frame_idx += 1
@@ -899,14 +942,21 @@ def main():
         ),
         formatter_class=argparse.RawTextHelpFormatter,
     )
+    # 경로 선택지는 config.yaml 의 routes 에서 동적으로 읽는다
+    # (토폴로지 전환 시 cross_* / gangnam_* 등 자동 반영).
+    try:
+        _cfg_routes = yaml.safe_load(open("config/config.yaml", encoding="utf-8"))
+        _route_choices = [r["name"] for r in _cfg_routes["experiments"]["routes"]]
+    except Exception:
+        _route_choices = ["cross_main"]
     parser.add_argument(
         "--models", nargs="+", default=["shortest_dijkstra", "rl_base"],
         metavar="MODEL",
         help=f"모델 선택 (공백 구분 / all=전체)\n선택지: {ALL_MODELS + ['all']}",
     )
-    parser.add_argument("--route", default="short_01",
-                        choices=["short_01", "short_02", "long_01", "long_02"],
-                        help="short_01/02=단거리, long_01/02=장거리")
+    parser.add_argument("--route", default=_route_choices[0],
+                        choices=_route_choices,
+                        help=f"실험 경로 (config.yaml routes 기준)\n선택지: {_route_choices}")
     parser.add_argument("--time_slot", default="off_peak",
                         choices=["off_peak", "peak"],
                         help="off_peak=07:00 한산, peak=08:00 병목")

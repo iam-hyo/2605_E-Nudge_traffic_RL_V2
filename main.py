@@ -37,10 +37,10 @@ def step_data(cfg: dict):
     topo_path = cfg["data"]["topology"]
     name = Path(topo_path).name.lower()
     if name.startswith("6x6_cross"):
-        # 사선 토폴로지 — 속도 CSV 는 6x6 격자와 link_id 호환되어 재사용
-        from util.generate_data_cross import generate_topology
-        generate_topology(topo_path)
-        print(f"  [info] 속도 파일은 재생성 없이 재사용: {cfg['data']['speed']}")
+        # 사선 토폴로지 — 토폴로지 + 등급별 속도 CSV 동시 생성
+        from util.generate_data_cross import generate_topology, generate_speed_csv
+        topo = generate_topology(topo_path)
+        generate_speed_csv(topo, cfg["data"]["speed"])
         return
     if name.startswith("6x6"):
         from util.generate_data_6x6 import generate_topology, generate_speed_csv

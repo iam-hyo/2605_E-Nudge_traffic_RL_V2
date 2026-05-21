@@ -8,7 +8,7 @@
     "start_hour": 7.0,
     "grid_size": 6,
     "spacing_m": 350,
-    "description": "6x6 cross-slant testbed (1..36). 6 slant roads × 6 horizontal lines. col1(B)=explicit-shortest/signal-hostile, col2(C)=explicit-detour/signal-friendly, col3(D)=hostile, col4(E)=friendly. Goal: Shortest picks B, Signal-aware picks C."
+    "description": "6x6 cross-slant testbed v3 (1..36, 36/36 signalized). col1(B)=explicit-shortest/signal-hostile, col2(C)=explicit-longest/signal-friendly green-wave (detour), col3(D)=slight-hostile, col4(E)=quite-friendly. Goal: shortest model picks B, signal-aware model picks C."
   },
   "nodes": [
     {
@@ -17,7 +17,24 @@
         0.0,
         0.0
       ],
-      "signal": null,
+      "signal": {
+        "cycle_length": 180,
+        "offset": 68,
+        "phases": [
+          {
+            "type": "green",
+            "duration": 24
+          },
+          {
+            "type": "left_turn",
+            "duration": 12
+          },
+          {
+            "type": "red",
+            "duration": 144
+          }
+        ]
+      },
       "left_turn_allowed": true
     },
     {
@@ -27,12 +44,12 @@
         0.0
       ],
       "signal": {
-        "cycle_length": 200,
-        "offset": 104,
+        "cycle_length": 220,
+        "offset": 67,
         "phases": [
           {
             "type": "green",
-            "duration": 15
+            "duration": 16
           },
           {
             "type": "left_turn",
@@ -40,7 +57,7 @@
           },
           {
             "type": "red",
-            "duration": 177
+            "duration": 196
           }
         ]
       },
@@ -49,24 +66,24 @@
     {
       "id": "3",
       "pos": [
-        1050.0,
+        1400.0,
         0.0
       ],
       "signal": {
         "cycle_length": 70,
-        "offset": 0,
+        "offset": 22,
         "phases": [
           {
             "type": "green",
-            "duration": 35
+            "duration": 44
           },
           {
             "type": "left_turn",
-            "duration": 24
+            "duration": 14
           },
           {
             "type": "red",
-            "duration": 11
+            "duration": 12
           }
         ]
       },
@@ -79,20 +96,20 @@
         0.0
       ],
       "signal": {
-        "cycle_length": 200,
-        "offset": 104,
+        "cycle_length": 150,
+        "offset": 81,
         "phases": [
           {
             "type": "green",
-            "duration": 15
+            "duration": 34
           },
           {
             "type": "left_turn",
-            "duration": 8
+            "duration": 12
           },
           {
             "type": "red",
-            "duration": 177
+            "duration": 104
           }
         ]
       },
@@ -101,24 +118,24 @@
     {
       "id": "5",
       "pos": [
-        2100.0,
+        2275.0,
         0.0
       ],
       "signal": {
-        "cycle_length": 70,
-        "offset": 0,
+        "cycle_length": 110,
+        "offset": 82,
         "phases": [
           {
             "type": "green",
-            "duration": 35
+            "duration": 42
           },
           {
             "type": "left_turn",
-            "duration": 24
+            "duration": 14
           },
           {
             "type": "red",
-            "duration": 11
+            "duration": 54
           }
         ]
       },
@@ -127,10 +144,27 @@
     {
       "id": "6",
       "pos": [
-        2800.0,
+        2450.0,
         0.0
       ],
-      "signal": null,
+      "signal": {
+        "cycle_length": 170,
+        "offset": 100,
+        "phases": [
+          {
+            "type": "green",
+            "duration": 28
+          },
+          {
+            "type": "left_turn",
+            "duration": 12
+          },
+          {
+            "type": "red",
+            "duration": 130
+          }
+        ]
+      },
       "left_turn_allowed": true
     },
     {
@@ -139,52 +173,77 @@
         0.0,
         350.0
       ],
-      "signal": null,
+      "signal": {
+        "cycle_length": 180,
+        "offset": 38,
+        "phases": [
+          {
+            "type": "green",
+            "duration": 24
+          },
+          {
+            "type": "left_turn",
+            "duration": 12
+          },
+          {
+            "type": "red",
+            "duration": 144
+          }
+        ]
+      },
       "left_turn_allowed": true
     },
     {
       "id": "8",
       "pos": [
-        420.0,
+        483.0,
         350.0
       ],
       "signal": {
-        "cycle_length": 200,
-        "offset": 43,
+        "cycle_length": 220,
+        "offset": 31,
         "phases": [
           {
             "type": "green",
-            "duration": 15
+            "duration": 16
+          },
+          {
+            "type": "left_turn",
+            "duration": 8
           },
           {
             "type": "red",
-            "duration": 185
+            "duration": 196
           }
         ]
       },
-      "left_turn_allowed": false
+      "left_turn_allowed": true
     },
     {
       "id": "9",
       "pos": [
-        1050.0,
+        1337.0,
         350.0
       ],
       "signal": {
         "cycle_length": 70,
-        "offset": 7,
+        "offset": 64,
         "phases": [
           {
             "type": "green",
-            "duration": 35
+            "duration": 44
+          },
+          {
+            "type": "left_turn",
+            "duration": 14
           },
           {
             "type": "red",
-            "duration": 35
+            "duration": 12
           }
         ]
       },
-      "left_turn_allowed": false
+      "left_turn_allowed": true
     },
     {
       "id": "10",
@@ -193,50 +252,75 @@
         350.0
       ],
       "signal": {
-        "cycle_length": 200,
-        "offset": 44,
+        "cycle_length": 150,
+        "offset": 65,
         "phases": [
           {
             "type": "green",
-            "duration": 15
+            "duration": 34
+          },
+          {
+            "type": "left_turn",
+            "duration": 12
           },
           {
             "type": "red",
-            "duration": 185
+            "duration": 104
           }
         ]
       },
-      "left_turn_allowed": false
+      "left_turn_allowed": true
     },
     {
       "id": "11",
       "pos": [
-        2100.0,
+        2240.0,
         350.0
       ],
       "signal": {
-        "cycle_length": 70,
-        "offset": 7,
+        "cycle_length": 110,
+        "offset": 66,
         "phases": [
           {
             "type": "green",
-            "duration": 35
+            "duration": 42
+          },
+          {
+            "type": "left_turn",
+            "duration": 14
           },
           {
             "type": "red",
-            "duration": 35
+            "duration": 54
           }
         ]
       },
-      "left_turn_allowed": false
+      "left_turn_allowed": true
     },
     {
       "id": "12",
       "pos": [
-        2730.0,
+        2450.0,
         350.0
       ],
-      "signal": null,
+      "signal": {
+        "cycle_length": 170,
+        "offset": 103,
+        "phases": [
+          {
+            "type": "green",
+            "duration": 28
+          },
+          {
+            "type": "left_turn",
+            "duration": 12
+          },
+          {
+            "type": "red",
+            "duration": 130
+          }
+        ]
+      },
       "left_turn_allowed": true
     },
     {
@@ -245,52 +329,77 @@
         0.0,
         700.0
       ],
-      "signal": null,
+      "signal": {
+        "cycle_length": 180,
+        "offset": 9,
+        "phases": [
+          {
+            "type": "green",
+            "duration": 24
+          },
+          {
+            "type": "left_turn",
+            "duration": 12
+          },
+          {
+            "type": "red",
+            "duration": 144
+          }
+        ]
+      },
       "left_turn_allowed": true
     },
     {
       "id": "14",
       "pos": [
-        490.0,
+        616.0,
         700.0
       ],
       "signal": {
-        "cycle_length": 200,
-        "offset": 179,
+        "cycle_length": 220,
+        "offset": 214,
         "phases": [
           {
             "type": "green",
-            "duration": 15
+            "duration": 16
+          },
+          {
+            "type": "left_turn",
+            "duration": 8
           },
           {
             "type": "red",
-            "duration": 185
+            "duration": 196
           }
         ]
       },
-      "left_turn_allowed": false
+      "left_turn_allowed": true
     },
     {
       "id": "15",
       "pos": [
-        1050.0,
+        1274.0,
         700.0
       ],
       "signal": {
         "cycle_length": 70,
-        "offset": 14,
+        "offset": 35,
         "phases": [
           {
             "type": "green",
-            "duration": 35
+            "duration": 44
+          },
+          {
+            "type": "left_turn",
+            "duration": 14
           },
           {
             "type": "red",
-            "duration": 35
+            "duration": 12
           }
         ]
       },
-      "left_turn_allowed": false
+      "left_turn_allowed": true
     },
     {
       "id": "16",
@@ -299,50 +408,75 @@
         700.0
       ],
       "signal": {
-        "cycle_length": 200,
-        "offset": 181,
+        "cycle_length": 150,
+        "offset": 49,
         "phases": [
           {
             "type": "green",
-            "duration": 15
+            "duration": 34
+          },
+          {
+            "type": "left_turn",
+            "duration": 12
           },
           {
             "type": "red",
-            "duration": 185
+            "duration": 104
           }
         ]
       },
-      "left_turn_allowed": false
+      "left_turn_allowed": true
     },
     {
       "id": "17",
       "pos": [
-        2100.0,
+        2205.0,
         700.0
       ],
       "signal": {
-        "cycle_length": 70,
-        "offset": 14,
+        "cycle_length": 110,
+        "offset": 51,
         "phases": [
           {
             "type": "green",
-            "duration": 35
+            "duration": 42
+          },
+          {
+            "type": "left_turn",
+            "duration": 14
           },
           {
             "type": "red",
-            "duration": 35
+            "duration": 54
           }
         ]
       },
-      "left_turn_allowed": false
+      "left_turn_allowed": true
     },
     {
       "id": "18",
       "pos": [
-        2660.0,
+        2450.0,
         700.0
       ],
-      "signal": null,
+      "signal": {
+        "cycle_length": 170,
+        "offset": 106,
+        "phases": [
+          {
+            "type": "green",
+            "duration": 28
+          },
+          {
+            "type": "left_turn",
+            "duration": 12
+          },
+          {
+            "type": "red",
+            "duration": 130
+          }
+        ]
+      },
       "left_turn_allowed": true
     },
     {
@@ -351,52 +485,77 @@
         0.0,
         1050.0
       ],
-      "signal": null,
+      "signal": {
+        "cycle_length": 180,
+        "offset": 160,
+        "phases": [
+          {
+            "type": "green",
+            "duration": 24
+          },
+          {
+            "type": "left_turn",
+            "duration": 12
+          },
+          {
+            "type": "red",
+            "duration": 144
+          }
+        ]
+      },
       "left_turn_allowed": true
     },
     {
       "id": "20",
       "pos": [
-        560.0,
+        749.0,
         1050.0
       ],
       "signal": {
-        "cycle_length": 200,
-        "offset": 115,
+        "cycle_length": 220,
+        "offset": 177,
         "phases": [
           {
             "type": "green",
-            "duration": 15
+            "duration": 16
+          },
+          {
+            "type": "left_turn",
+            "duration": 8
           },
           {
             "type": "red",
-            "duration": 185
+            "duration": 196
           }
         ]
       },
-      "left_turn_allowed": false
+      "left_turn_allowed": true
     },
     {
       "id": "21",
       "pos": [
-        1050.0,
+        1211.0,
         1050.0
       ],
       "signal": {
         "cycle_length": 70,
-        "offset": 21,
+        "offset": 7,
         "phases": [
           {
             "type": "green",
-            "duration": 35
+            "duration": 44
+          },
+          {
+            "type": "left_turn",
+            "duration": 14
           },
           {
             "type": "red",
-            "duration": 35
+            "duration": 12
           }
         ]
       },
-      "left_turn_allowed": false
+      "left_turn_allowed": true
     },
     {
       "id": "22",
@@ -405,50 +564,75 @@
         1050.0
       ],
       "signal": {
-        "cycle_length": 200,
-        "offset": 118,
+        "cycle_length": 150,
+        "offset": 33,
         "phases": [
           {
             "type": "green",
-            "duration": 15
+            "duration": 34
+          },
+          {
+            "type": "left_turn",
+            "duration": 12
           },
           {
             "type": "red",
-            "duration": 185
+            "duration": 104
           }
         ]
       },
-      "left_turn_allowed": false
+      "left_turn_allowed": true
     },
     {
       "id": "23",
       "pos": [
-        2100.0,
+        2170.0,
         1050.0
       ],
       "signal": {
-        "cycle_length": 70,
-        "offset": 21,
+        "cycle_length": 110,
+        "offset": 35,
         "phases": [
           {
             "type": "green",
-            "duration": 35
+            "duration": 42
+          },
+          {
+            "type": "left_turn",
+            "duration": 14
           },
           {
             "type": "red",
-            "duration": 35
+            "duration": 54
           }
         ]
       },
-      "left_turn_allowed": false
+      "left_turn_allowed": true
     },
     {
       "id": "24",
       "pos": [
-        2590.0,
+        2450.0,
         1050.0
       ],
-      "signal": null,
+      "signal": {
+        "cycle_length": 170,
+        "offset": 108,
+        "phases": [
+          {
+            "type": "green",
+            "duration": 28
+          },
+          {
+            "type": "left_turn",
+            "duration": 12
+          },
+          {
+            "type": "red",
+            "duration": 130
+          }
+        ]
+      },
       "left_turn_allowed": true
     },
     {
@@ -457,52 +641,77 @@
         0.0,
         1400.0
       ],
-      "signal": null,
+      "signal": {
+        "cycle_length": 180,
+        "offset": 131,
+        "phases": [
+          {
+            "type": "green",
+            "duration": 24
+          },
+          {
+            "type": "left_turn",
+            "duration": 12
+          },
+          {
+            "type": "red",
+            "duration": 144
+          }
+        ]
+      },
       "left_turn_allowed": true
     },
     {
       "id": "26",
       "pos": [
-        630.0,
+        882.0,
         1400.0
       ],
       "signal": {
-        "cycle_length": 200,
-        "offset": 51,
+        "cycle_length": 220,
+        "offset": 141,
         "phases": [
           {
             "type": "green",
-            "duration": 15
+            "duration": 16
+          },
+          {
+            "type": "left_turn",
+            "duration": 8
           },
           {
             "type": "red",
-            "duration": 185
+            "duration": 196
           }
         ]
       },
-      "left_turn_allowed": false
+      "left_turn_allowed": true
     },
     {
       "id": "27",
       "pos": [
-        1050.0,
+        1148.0,
         1400.0
       ],
       "signal": {
         "cycle_length": 70,
-        "offset": 28,
+        "offset": 48,
         "phases": [
           {
             "type": "green",
-            "duration": 35
+            "duration": 44
+          },
+          {
+            "type": "left_turn",
+            "duration": 14
           },
           {
             "type": "red",
-            "duration": 35
+            "duration": 12
           }
         ]
       },
-      "left_turn_allowed": false
+      "left_turn_allowed": true
     },
     {
       "id": "28",
@@ -511,50 +720,75 @@
         1400.0
       ],
       "signal": {
-        "cycle_length": 200,
-        "offset": 54,
+        "cycle_length": 150,
+        "offset": 17,
         "phases": [
           {
             "type": "green",
-            "duration": 15
+            "duration": 34
+          },
+          {
+            "type": "left_turn",
+            "duration": 12
           },
           {
             "type": "red",
-            "duration": 185
+            "duration": 104
           }
         ]
       },
-      "left_turn_allowed": false
+      "left_turn_allowed": true
     },
     {
       "id": "29",
       "pos": [
-        2100.0,
+        2135.0,
         1400.0
       ],
       "signal": {
-        "cycle_length": 70,
-        "offset": 28,
+        "cycle_length": 110,
+        "offset": 20,
         "phases": [
           {
             "type": "green",
-            "duration": 35
+            "duration": 42
+          },
+          {
+            "type": "left_turn",
+            "duration": 14
           },
           {
             "type": "red",
-            "duration": 35
+            "duration": 54
           }
         ]
       },
-      "left_turn_allowed": false
+      "left_turn_allowed": true
     },
     {
       "id": "30",
       "pos": [
-        2520.0,
+        2450.0,
         1400.0
       ],
-      "signal": null,
+      "signal": {
+        "cycle_length": 170,
+        "offset": 111,
+        "phases": [
+          {
+            "type": "green",
+            "duration": 28
+          },
+          {
+            "type": "left_turn",
+            "duration": 12
+          },
+          {
+            "type": "red",
+            "duration": 130
+          }
+        ]
+      },
       "left_turn_allowed": true
     },
     {
@@ -563,52 +797,77 @@
         0.0,
         1750.0
       ],
-      "signal": null,
+      "signal": {
+        "cycle_length": 180,
+        "offset": 101,
+        "phases": [
+          {
+            "type": "green",
+            "duration": 24
+          },
+          {
+            "type": "left_turn",
+            "duration": 12
+          },
+          {
+            "type": "red",
+            "duration": 144
+          }
+        ]
+      },
       "left_turn_allowed": true
     },
     {
       "id": "32",
       "pos": [
-        700.0,
+        1015.0,
         1750.0
       ],
       "signal": {
-        "cycle_length": 200,
-        "offset": 186,
+        "cycle_length": 220,
+        "offset": 104,
         "phases": [
           {
             "type": "green",
-            "duration": 15
+            "duration": 16
+          },
+          {
+            "type": "left_turn",
+            "duration": 8
           },
           {
             "type": "red",
-            "duration": 185
+            "duration": 196
           }
         ]
       },
-      "left_turn_allowed": false
+      "left_turn_allowed": true
     },
     {
       "id": "33",
       "pos": [
-        1050.0,
+        1085.0,
         1750.0
       ],
       "signal": {
         "cycle_length": 70,
-        "offset": 35,
+        "offset": 20,
         "phases": [
           {
             "type": "green",
-            "duration": 35
+            "duration": 44
+          },
+          {
+            "type": "left_turn",
+            "duration": 14
           },
           {
             "type": "red",
-            "duration": 35
+            "duration": 12
           }
         ]
       },
-      "left_turn_allowed": false
+      "left_turn_allowed": true
     },
     {
       "id": "34",
@@ -617,20 +876,24 @@
         1750.0
       ],
       "signal": {
-        "cycle_length": 200,
-        "offset": 191,
+        "cycle_length": 150,
+        "offset": 1,
         "phases": [
           {
             "type": "green",
-            "duration": 15
+            "duration": 34
+          },
+          {
+            "type": "left_turn",
+            "duration": 12
           },
           {
             "type": "red",
-            "duration": 185
+            "duration": 104
           }
         ]
       },
-      "left_turn_allowed": false
+      "left_turn_allowed": true
     },
     {
       "id": "35",
@@ -639,20 +902,24 @@
         1750.0
       ],
       "signal": {
-        "cycle_length": 70,
-        "offset": 35,
+        "cycle_length": 110,
+        "offset": 4,
         "phases": [
           {
             "type": "green",
-            "duration": 35
+            "duration": 42
+          },
+          {
+            "type": "left_turn",
+            "duration": 14
           },
           {
             "type": "red",
-            "duration": 35
+            "duration": 54
           }
         ]
       },
-      "left_turn_allowed": false
+      "left_turn_allowed": true
     },
     {
       "id": "36",
@@ -660,7 +927,24 @@
         2450.0,
         1750.0
       ],
-      "signal": null,
+      "signal": {
+        "cycle_length": 170,
+        "offset": 114,
+        "phases": [
+          {
+            "type": "green",
+            "duration": 28
+          },
+          {
+            "type": "left_turn",
+            "duration": 12
+          },
+          {
+            "type": "red",
+            "duration": 130
+          }
+        ]
+      },
       "left_turn_allowed": true
     }
   ],
@@ -685,7 +969,7 @@
       "id": "2_3",
       "end1": "2",
       "end2": "3",
-      "len": 700.0,
+      "len": 1050.0,
       "road_type": "arterial",
       "LANES": "2"
     },
@@ -693,7 +977,7 @@
       "id": "2_8",
       "end1": "2",
       "end2": "8",
-      "len": 356.9,
+      "len": 374.4,
       "road_type": "local",
       "LANES": "2"
     },
@@ -701,7 +985,7 @@
       "id": "3_4",
       "end1": "3",
       "end2": "4",
-      "len": 700.0,
+      "len": 350.0,
       "road_type": "arterial",
       "LANES": "2"
     },
@@ -709,7 +993,7 @@
       "id": "3_9",
       "end1": "3",
       "end2": "9",
-      "len": 350.0,
+      "len": 355.6,
       "road_type": "arterial",
       "LANES": "2"
     },
@@ -717,7 +1001,7 @@
       "id": "4_5",
       "end1": "4",
       "end2": "5",
-      "len": 350.0,
+      "len": 525.0,
       "road_type": "arterial",
       "LANES": "2"
     },
@@ -733,7 +1017,7 @@
       "id": "5_6",
       "end1": "5",
       "end2": "6",
-      "len": 700.0,
+      "len": 175.0,
       "road_type": "arterial",
       "LANES": "2"
     },
@@ -741,7 +1025,7 @@
       "id": "11_5",
       "end1": "5",
       "end2": "11",
-      "len": 350.0,
+      "len": 351.7,
       "road_type": "arterial",
       "LANES": "2"
     },
@@ -749,7 +1033,7 @@
       "id": "12_6",
       "end1": "6",
       "end2": "12",
-      "len": 356.9,
+      "len": 350.0,
       "road_type": "local",
       "LANES": "2"
     },
@@ -757,7 +1041,7 @@
       "id": "7_8",
       "end1": "7",
       "end2": "8",
-      "len": 420.0,
+      "len": 483.0,
       "road_type": "local",
       "LANES": "2"
     },
@@ -773,7 +1057,7 @@
       "id": "8_9",
       "end1": "8",
       "end2": "9",
-      "len": 630.0,
+      "len": 854.0,
       "road_type": "arterial",
       "LANES": "2"
     },
@@ -781,7 +1065,7 @@
       "id": "14_8",
       "end1": "8",
       "end2": "14",
-      "len": 356.9,
+      "len": 374.4,
       "road_type": "local",
       "LANES": "2"
     },
@@ -789,7 +1073,7 @@
       "id": "10_9",
       "end1": "9",
       "end2": "10",
-      "len": 735.0,
+      "len": 448.0,
       "road_type": "arterial",
       "LANES": "2"
     },
@@ -797,7 +1081,7 @@
       "id": "15_9",
       "end1": "9",
       "end2": "15",
-      "len": 350.0,
+      "len": 355.6,
       "road_type": "arterial",
       "LANES": "2"
     },
@@ -805,7 +1089,7 @@
       "id": "10_11",
       "end1": "10",
       "end2": "11",
-      "len": 315.0,
+      "len": 455.0,
       "road_type": "arterial",
       "LANES": "2"
     },
@@ -821,7 +1105,7 @@
       "id": "11_12",
       "end1": "11",
       "end2": "12",
-      "len": 630.0,
+      "len": 210.0,
       "road_type": "arterial",
       "LANES": "2"
     },
@@ -829,7 +1113,7 @@
       "id": "11_17",
       "end1": "11",
       "end2": "17",
-      "len": 350.0,
+      "len": 351.7,
       "road_type": "arterial",
       "LANES": "2"
     },
@@ -837,7 +1121,7 @@
       "id": "12_18",
       "end1": "12",
       "end2": "18",
-      "len": 356.9,
+      "len": 350.0,
       "road_type": "local",
       "LANES": "2"
     },
@@ -845,7 +1129,7 @@
       "id": "13_14",
       "end1": "13",
       "end2": "14",
-      "len": 490.0,
+      "len": 616.0,
       "road_type": "local",
       "LANES": "2"
     },
@@ -861,7 +1145,7 @@
       "id": "14_15",
       "end1": "14",
       "end2": "15",
-      "len": 560.0,
+      "len": 658.0,
       "road_type": "arterial",
       "LANES": "2"
     },
@@ -869,7 +1153,7 @@
       "id": "14_20",
       "end1": "14",
       "end2": "20",
-      "len": 356.9,
+      "len": 374.4,
       "road_type": "local",
       "LANES": "2"
     },
@@ -877,7 +1161,7 @@
       "id": "15_16",
       "end1": "15",
       "end2": "16",
-      "len": 770.0,
+      "len": 546.0,
       "road_type": "arterial",
       "LANES": "2"
     },
@@ -885,7 +1169,7 @@
       "id": "15_21",
       "end1": "15",
       "end2": "21",
-      "len": 350.0,
+      "len": 355.6,
       "road_type": "arterial",
       "LANES": "2"
     },
@@ -893,7 +1177,7 @@
       "id": "16_17",
       "end1": "16",
       "end2": "17",
-      "len": 280.0,
+      "len": 385.0,
       "road_type": "arterial",
       "LANES": "2"
     },
@@ -909,7 +1193,7 @@
       "id": "17_18",
       "end1": "17",
       "end2": "18",
-      "len": 560.0,
+      "len": 245.0,
       "road_type": "arterial",
       "LANES": "2"
     },
@@ -917,7 +1201,7 @@
       "id": "17_23",
       "end1": "17",
       "end2": "23",
-      "len": 350.0,
+      "len": 351.7,
       "road_type": "arterial",
       "LANES": "2"
     },
@@ -925,7 +1209,7 @@
       "id": "18_24",
       "end1": "18",
       "end2": "24",
-      "len": 356.9,
+      "len": 350.0,
       "road_type": "local",
       "LANES": "2"
     },
@@ -933,7 +1217,7 @@
       "id": "19_20",
       "end1": "19",
       "end2": "20",
-      "len": 560.0,
+      "len": 749.0,
       "road_type": "local",
       "LANES": "2"
     },
@@ -949,7 +1233,7 @@
       "id": "20_21",
       "end1": "20",
       "end2": "21",
-      "len": 490.0,
+      "len": 462.0,
       "road_type": "arterial",
       "LANES": "2"
     },
@@ -957,7 +1241,7 @@
       "id": "20_26",
       "end1": "20",
       "end2": "26",
-      "len": 356.9,
+      "len": 374.4,
       "road_type": "local",
       "LANES": "2"
     },
@@ -965,7 +1249,7 @@
       "id": "21_22",
       "end1": "21",
       "end2": "22",
-      "len": 805.0,
+      "len": 644.0,
       "road_type": "arterial",
       "LANES": "2"
     },
@@ -973,7 +1257,7 @@
       "id": "21_27",
       "end1": "21",
       "end2": "27",
-      "len": 350.0,
+      "len": 355.6,
       "road_type": "arterial",
       "LANES": "2"
     },
@@ -981,7 +1265,7 @@
       "id": "22_23",
       "end1": "22",
       "end2": "23",
-      "len": 245.0,
+      "len": 315.0,
       "road_type": "arterial",
       "LANES": "2"
     },
@@ -997,7 +1281,7 @@
       "id": "23_24",
       "end1": "23",
       "end2": "24",
-      "len": 490.0,
+      "len": 280.0,
       "road_type": "arterial",
       "LANES": "2"
     },
@@ -1005,7 +1289,7 @@
       "id": "23_29",
       "end1": "23",
       "end2": "29",
-      "len": 350.0,
+      "len": 351.7,
       "road_type": "arterial",
       "LANES": "2"
     },
@@ -1013,7 +1297,7 @@
       "id": "24_30",
       "end1": "24",
       "end2": "30",
-      "len": 356.9,
+      "len": 350.0,
       "road_type": "local",
       "LANES": "2"
     },
@@ -1021,7 +1305,7 @@
       "id": "25_26",
       "end1": "25",
       "end2": "26",
-      "len": 630.0,
+      "len": 882.0,
       "road_type": "local",
       "LANES": "2"
     },
@@ -1037,7 +1321,7 @@
       "id": "26_27",
       "end1": "26",
       "end2": "27",
-      "len": 420.0,
+      "len": 266.0,
       "road_type": "arterial",
       "LANES": "2"
     },
@@ -1045,7 +1329,7 @@
       "id": "26_32",
       "end1": "26",
       "end2": "32",
-      "len": 356.9,
+      "len": 374.4,
       "road_type": "local",
       "LANES": "2"
     },
@@ -1053,7 +1337,7 @@
       "id": "27_28",
       "end1": "27",
       "end2": "28",
-      "len": 840.0,
+      "len": 742.0,
       "road_type": "arterial",
       "LANES": "2"
     },
@@ -1061,7 +1345,7 @@
       "id": "27_33",
       "end1": "27",
       "end2": "33",
-      "len": 350.0,
+      "len": 355.6,
       "road_type": "arterial",
       "LANES": "2"
     },
@@ -1069,7 +1353,7 @@
       "id": "28_29",
       "end1": "28",
       "end2": "29",
-      "len": 210.0,
+      "len": 245.0,
       "road_type": "arterial",
       "LANES": "2"
     },
@@ -1085,7 +1369,7 @@
       "id": "29_30",
       "end1": "29",
       "end2": "30",
-      "len": 420.0,
+      "len": 315.0,
       "road_type": "arterial",
       "LANES": "2"
     },
@@ -1093,7 +1377,7 @@
       "id": "29_35",
       "end1": "29",
       "end2": "35",
-      "len": 350.0,
+      "len": 351.7,
       "road_type": "arterial",
       "LANES": "2"
     },
@@ -1101,7 +1385,7 @@
       "id": "30_36",
       "end1": "30",
       "end2": "36",
-      "len": 356.9,
+      "len": 350.0,
       "road_type": "local",
       "LANES": "2"
     },
@@ -1109,7 +1393,7 @@
       "id": "31_32",
       "end1": "31",
       "end2": "32",
-      "len": 700.0,
+      "len": 1015.0,
       "road_type": "local",
       "LANES": "2"
     },
@@ -1117,7 +1401,7 @@
       "id": "32_33",
       "end1": "32",
       "end2": "33",
-      "len": 350.0,
+      "len": 70.0,
       "road_type": "arterial",
       "LANES": "2"
     },
@@ -1125,7 +1409,7 @@
       "id": "33_34",
       "end1": "33",
       "end2": "34",
-      "len": 875.0,
+      "len": 840.0,
       "road_type": "arterial",
       "LANES": "2"
     },

@@ -9,6 +9,12 @@ QNetwork 세 가지 변형 (State 229d 기준).
 
 모두 Dueling DQN 구조 (Value + Advantage stream).
 
+행동 공간 — 엣지-상대적 (edge-relative):
+  출력 차원 = ACTION_DIM = K_HOP1 (고정). 전역 노드 수 N 에 의존하지 않는다.
+  슬롯 k 의 Q값 = "현재 노드에서 방위순 k 번째 유효 엣지를 택할 때의 가치".
+  → 토폴로지가 바뀌어도(노드 수가 달라도) 모델 구조·가중치가 그대로 유효.
+    여러 토폴로지 동시 학습 / 미지 토폴로지 일반화가 가능해진다.
+
 State 229d 구조 (environment.py와 동기):
   s[0:5]      위치 (5d)
   s[5:8]      시간 (3d)
@@ -55,6 +61,9 @@ LINK_BLOCK_DIM = K_HOP1 * LINK1_DIM + L_HOP2 * LINK2_DIM   # 8 + 72 = 80
 EMBED_DIM      = 64
 N_NODE_TOKENS  = 1 + K_HOP1 + N_HOP2   # cur + hop1 + hop2 = 13
 
+# 엣지-상대적 행동 공간: 출력 슬롯 수 = 1-hop 후보 엣지 최대 개수 (K_HOP1)
+ACTION_DIM     = K_HOP1                # = 4
+
 
 def _dueling_head(in_dim: int, action_size: int) -> tuple[nn.Module, nn.Module]:
     value = nn.Sequential(nn.Linear(in_dim, 128), nn.ReLU(), nn.Linear(128, 1))
@@ -74,11 +83,11 @@ class QNetworkBase(nn.Module):
     State 차원은 통일 (229d) 하되, forward 진입 시 신호 차원을 0으로 마스킹.
     """
 
-    def __init__(self, action_size: int):
+    def __init__(self):
         super().__init__()
         self.fc1 = nn.Linear(STATE_SIZE, 512)
         self.fc2 = nn.Linear(512, 256)
-        self.value, self.adv = _dueling_head(256, action_size)
+        self.value, self.adv = _dueling_head(256, ACTION_DIM)
 
     def _mask_signal(self, state: torch.Tensor) -> torch.Tensor:
         x = state.clone()
@@ -105,11 +114,11 @@ class QNetworkBase(nn.Module):
 class QNetworkSignal(nn.Module):
     """신호 State 포함, 단순 MLP + Dueling."""
 
-    def __init__(self, action_size: int):
+    def __init__(self):
         super().__init__()
         self.fc1 = nn.Linear(STATE_SIZE, 512)
         self.fc2 = nn.Linear(512, 256)
-        self.value, self.adv = _dueling_head(256, action_size)
+        self.value, self.adv = _dueling_head(256, ACTION_DIM)
 
     def forward(self, state: torch.Tensor) -> torch.Tensor:
         x = F.relu(self.fc1(state))
@@ -136,7 +145,7 @@ class QNetworkAttention(nn.Module):
       [5..12]  = 2-hop N=8 (hop_onehot=[0,0,1])
     """
 
-    def __init__(self, action_size: int):
+    def __init__(self):
         super().__init__()
         # 쿼리: 위치(5) + 시간(3) + 현재 신호(9) = 17d
         self.query_enc = nn.Sequential(
@@ -161,7 +170,7 @@ class QNetworkAttention(nn.Module):
         )
 
         fused = EMBED_DIM * 3   # global(64) + attn_out(64) + link_emb(64)
-        self.value, self.adv = _dueling_head(fused, action_size)
+        self.value, self.adv = _dueling_head(fused, ACTION_DIM)
 
     @staticmethod
     def _build_node_tokens(state: torch.Tensor) -> torch.Tensor:
@@ -247,14 +256,17 @@ class QNetworkAttention(nn.Module):
 
 
 # ── 팩토리 함수 ───────────────────────────────────────────────────────────────
-def build_model(mode: str, action_size: int) -> nn.Module:
+def build_model(mode: str) -> nn.Module:
     """
     mode: 'base' | 'signal' | 'attention'
+
+    출력 차원은 항상 ACTION_DIM(=K_HOP1) — 엣지-상대적 행동 공간이라
+    토폴로지(노드 수)와 무관하게 고정.
     """
     if mode == "base":
-        return QNetworkBase(action_size)
+        return QNetworkBase()
     elif mode == "signal":
-        return QNetworkSignal(action_size)
+        return QNetworkSignal()
     elif mode == "attention":
-        return QNetworkAttention(action_size)
+        return QNetworkAttention()
     raise ValueError(f"Unknown mode: {mode}")

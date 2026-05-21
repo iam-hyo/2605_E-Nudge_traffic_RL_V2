@@ -401,14 +401,18 @@ class RoadNetworkEnv:
 
     def get_valid_actions(self) -> list[str]:
         """
-        선택 가능한 다음 노드 목록.
+        선택 가능한 다음 노드 목록 (엣지-상대적 행동 공간).
 
         제외 규칙:
           1. U턴 (previous_node)
           2. 좌회전 불가 노드에서의 좌회전 이동
              (cur 노드의 좌회전 phase 부재 또는 left_turn_allowed=False)
 
-        정렬로 순서 고정 → State 패딩 일관성 유지.
+        정렬·절단 규칙:
+          나가는 엣지의 방위각(atan2)으로 오름차순 정렬 후 최대 K_HOP1 개로 절단.
+          → 슬롯 인덱스 k 가 토폴로지·노드 ID와 무관하게 "방위" 라는 물리적
+            의미를 갖는다 (엣지-상대적 행동 공간의 핵심). 모델 출력 슬롯 k 가
+            정확히 이 리스트의 k 번째 엣지에 대응 — State 1-hop 블록 순서와도 일치.
         """
         cur_node = self.nodes[self.current_node]
         cur_pos  = cur_node["pos"]
@@ -429,7 +433,13 @@ class RoadNetworkEnv:
                 if _movement_type(prev_pos, cur_pos, to_pos) == "left":
                     continue
             valid.append(nb)
-        return sorted(valid)
+
+        def _bearing_key(nb: str) -> tuple[float, str]:
+            tx, ty = self.nodes[nb]["pos"]
+            return (math.atan2(ty - cur_pos[1], tx - cur_pos[0]), nb)
+
+        valid.sort(key=_bearing_key)
+        return valid[:K_HOP1]
 
     def step(self, action: str) -> tuple[np.ndarray, float, bool, dict]:
         # 링크 탐색
