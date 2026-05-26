@@ -12,8 +12,31 @@ import argparse, math, sys
 from pathlib import Path
 
 import matplotlib
-matplotlib.rcParams["font.family"] = ["Malgun Gothic", "DejaVu Sans"]
+from matplotlib import font_manager as _fm
+
+
+def _pick_korean_font() -> str | None:
+    """플랫폼별로 사용 가능한 한글 폰트를 골라 반환 (없으면 None).
+    Noto Sans CJK 는 pan-CJK 폰트라 JP face 도 한글 글리프를 동일하게 포함한다."""
+    available = {f.name for f in _fm.fontManager.ttflist}
+    for cand in ("Malgun Gothic",                       # Windows
+                 "AppleGothic", "Apple SD Gothic Neo",  # macOS
+                 "NanumGothic", "NanumBarunGothic",      # Linux (nanum)
+                 "Noto Sans CJK KR", "Noto Sans KR",     # Linux (noto, KR face)
+                 "Noto Sans CJK JP"):                    # Linux (noto, JP face — 한글 포함)
+        if cand in available:
+            return cand
+    return None
+
+
+_KOREAN_FONT = _pick_korean_font()
+matplotlib.rcParams["font.family"] = (
+    [_KOREAN_FONT, "DejaVu Sans"] if _KOREAN_FONT else ["DejaVu Sans"]
+)
 matplotlib.rcParams["axes.unicode_minus"] = False
+if _KOREAN_FONT is None:
+    print("  [경고] 한글 폰트를 찾지 못했습니다 — 텍스트의 한글이 깨질 수 있습니다.",
+          file=sys.stderr)
 # --gif_only 플래그 조기 감지: pyplot import 전에 백엔드 결정
 _GIF_ONLY_MODE = "--gif_only" in sys.argv
 matplotlib.use("Agg" if _GIF_ONLY_MODE else "TkAgg")
@@ -49,6 +72,8 @@ MAX_WAIT_FRAMES      = 60   # 신호 대기 최대 프레임 수 (1배속 기준
 BG_FIGURE = "#f4f6fb"
 BG_CARD   = "#ffffff"
 BG_HDR    = "#f0f2f8"
+BG_HDR_REACHED = "#cdeed9"   # 도달 완료 — 헤더 초록 강조
+BG_HDR_TIMEOUT = "#f2d4d4"   # 타임아웃 — 헤더 적색 강조
 BG_MAP    = "#eef0f5"
 TEXT_DARK = "#22242a"
 TEXT_MID  = "#555770"
@@ -66,8 +91,8 @@ ALL_MODELS = list(MODEL_META.keys())
 
 TIMESLOT_LABEL   = {"off_peak": "07:00 한산", "peak": "08:00 병목"}
 ROUTE_TYPE_LABEL = {
-    "short_01": "단거리 ①", "short_02": "단거리 ②",
-    "long_01":  "장거리 ①", "long_02":  "장거리 ②",
+    "cross_main": "메인 경로", "cross_aux1": "보조 경로 ①",
+    "cross_aux2": "보조 경로 ②", "cross_aux3": "보조 경로 ③",
 }
 
 # 신호 페이즈 색 (yellow → red 처리)
@@ -140,7 +165,6 @@ def _load_model(name: str, cfg: dict, env: RoadNetworkEnv):
                 "rl_signal_attention": "model_rl_signal_attention.pth"}
     tc = cfg["train"]
     agent = DQNAgent(
-        action_size=env.action_size, node_list=sorted(env.nodes.keys()),
         mode=mode_map[name], gamma=tc["gamma"],
         epsilon_min=tc["epsilon_min"], epsilon=tc["epsilon_min"],
         epsilon_decay=1.0, lr=tc["lr"],
@@ -178,6 +202,7 @@ class _AgentState:
 
         self.done    = False
         self.reached = False
+        self.arrival_time = None      # 목적지 도달(또는 종료) 시각 — 시간 표시 고정용
 
         # 누적 지표 (cum_time = 자기 시뮬 시간, sim_time 과 다를 수 있음:
         # link 진행 중에는 sim_time 이 더 앞서 있을 수 있음. 대시보드에는
@@ -317,6 +342,16 @@ class _AgentState:
             if self._mode == "done":
                 return
 
+        # 마지막 link (목표 도착 link) 의 주행까지 모두 끝났으면 종료 처리.
+        # _sim_done 이 set 되면 위 while 이 _prepare_next 를 더 호출하지 않으므로
+        # 여기서 직접 done 으로 전환해 줘야 한다.
+        if self._sim_done and sim_time >= self._link_sim_start + self._link_total - 1e-9:
+            self._mode = "done"
+            self.done  = True
+            self.pos   = list(self._pos_to)
+            self.speed_kmh = 0.0
+            return
+
         local_t = sim_time - self._link_sim_start  # 0 ~ _link_total
         if local_t < self._link_t_wait:
             # 출발 대기
@@ -324,19 +359,24 @@ class _AgentState:
             self.pos   = list(self._pos_from)
             self.speed_kmh = 0.0
         else:
-            # 주행
+            # 주행 — 노드에서의 인위적 정지·재가속 제거 (2026-05-21 수정).
+            # 기존 smoothstep(ease-in-out)은 모든 링크 경계에서 속도를 0으로
+            # 만들어, 무신호·녹색 직진에서도 차가 노드마다 멈췄다 출발하는 것처럼
+            # 보였다. 이제 신호 대기(waiting)가 있었던 링크만 정지 상태에서
+            # 부드럽게 가속하고, 그 외에는 등속으로 노드를 통과한다.
             self._mode = "traveling"
             t_in_travel = local_t - self._link_t_wait
             r = min(1.0, max(0.0, t_in_travel / max(self._link_t_travel, 1e-6)))
-            ease = r * r * (3.0 - 2.0 * r)   # smoothstep ease-in-out
+            if self._link_t_wait > 1e-6:
+                frac = r * r                       # 신호 정지 후 출발 — ease-in 가속
+                self.speed_kmh = self._link_v_cruise * min(1.0, 2.0 * r)
+            else:
+                frac = r                           # 무신호·녹색 직진 — 등속 통과
+                self.speed_kmh = self._link_v_cruise
             self.pos = [
-                self._pos_from[0] + (self._pos_to[0] - self._pos_from[0]) * ease,
-                self._pos_from[1] + (self._pos_to[1] - self._pos_from[1]) * ease,
+                self._pos_from[0] + (self._pos_to[0] - self._pos_from[0]) * frac,
+                self._pos_from[1] + (self._pos_to[1] - self._pos_from[1]) * frac,
             ]
-            # 순간 속도 ≈ ease 미분 × 평균속도. smoothstep' = 6r(1-r), max=1.5 at r=0.5
-            ease_prime = 6.0 * r * (1.0 - r)
-            self.speed_kmh = self._link_v_cruise * ease_prime / 1.5
-            # 종착 근접 → 도착 마지막 미세 정착
             if r >= 1.0 - 1e-6:
                 self.pos = list(self._pos_to)
                 self.speed_kmh = self._link_v_cruise
@@ -364,7 +404,10 @@ class _AgentState:
 class Simulator:
     def __init__(self, cfg_path: str, model_names: list[str],
                  route_name: str, time_slot: str, speed_mult: int = 1,
-                 gif_path: str | None = None):
+                 gif_path: str | None = None,
+                 camera_mode: str = "auto",
+                 follow_model: str | None = None,
+                 show_minimap: bool = True):
         self.cfg = yaml.safe_load(open(cfg_path, encoding="utf-8"))
         routes   = {r["name"]: r for r in self.cfg["experiments"]["routes"]}
         tslots   = {t["label"]: t for t in self.cfg["experiments"]["time_slots"]}
@@ -406,6 +449,26 @@ class Simulator:
         self.sim_time = 0.0
         self.sim_dt   = 0.5 * speed_mult
 
+        # 카메라 설정 — auto: 강남 규모(>200노드) 면 동적 fit, 격자면 overview.
+        if camera_mode == "auto":
+            camera_mode = "fit" if self.ref_env.N > 200 else "overview"
+        self._camera_mode  = camera_mode
+        self._show_minimap = show_minimap and (camera_mode != "overview")
+        self._follow_idx   = None
+        if camera_mode == "follow":
+            if follow_model:
+                for i, ag in enumerate(self.agents):
+                    if ag.name == follow_model:
+                        self._follow_idx = i; break
+            if self._follow_idx is None:
+                self._follow_idx = 0
+        env = self.ref_env
+        # 카메라 최소 반지름 — 맵 대각의 1.8% (강남 위경도 좌표에서 약 250m 상당)
+        self._cam_min_half = env.map_diag * 0.018
+        cx0 = (env.map_x_min + env.map_x_max) / 2
+        cy0 = (env.map_y_min + env.map_y_max) / 2
+        self._cam_cur = (cx0, cy0, max(env.map_w, env.map_h) / 2)
+
         self._build_figure()
 
     # ── 그림 뼈대 ────────────────────────────────────────────────────────────
@@ -445,6 +508,7 @@ class Simulator:
     # ── 정보 카드 초기화 ──────────────────────────────────────────────────────
     def _init_info_cards(self):
         self._card_texts: list[dict] = []
+        self._card_headers: list = []
 
         for ax, ag in zip(self.info_axes, self.agents):
             meta  = MODEL_META[ag.name]
@@ -460,11 +524,13 @@ class Simulator:
                 sp.set_edgecolor(color if side == "left" else GRID_CLR)
                 sp.set_linewidth(3.5 if side == "left" else 0.8)
 
-            ax.add_patch(mpatches.FancyBboxPatch(
+            _hdr = mpatches.FancyBboxPatch(
                 (0, 0.78), 1, 0.22, boxstyle="square,pad=0",
                 transform=ax.transAxes,
                 facecolor=BG_HDR, edgecolor="none", clip_on=False,
-            ))
+            )
+            ax.add_patch(_hdr)
+            self._card_headers.append(_hdr)
 
             ax.text(0.07, 0.89, meta["no"], transform=ax.transAxes,
                     va="center", ha="left", fontsize=12,
@@ -500,14 +566,23 @@ class Simulator:
             })
 
     def _update_info_cards(self):
-        """매 frame 호출. 시간=global sim_time(모든 모델 동일), 나머지=agent별 실시간."""
-        for texts, ag in zip(self._card_texts, self.agents):
-            if ag.reached:
-                texts["status"].set_text("도달 완료 ✓")
-                texts["status"].set_color("#16a858")
-            elif ag.done:
-                texts["status"].set_text("타임아웃 ✗")
-                texts["status"].set_color("#c83030")
+        """매 frame 호출. 도달·종료한 agent 는 그 시점에서 시간·헤더를 고정한다."""
+        for i, (texts, ag) in enumerate(zip(self._card_texts, self.agents)):
+            # 도달/종료 시각 1회 고정 (마지막 링크 종료 시각)
+            if ag.done and ag.arrival_time is None:
+                ag.arrival_time = ag._link_sim_start + ag._link_total
+
+            # 헤더·상태·시간·속도를 모두 done(시각적 주행 완료) 기준으로 일치시켜
+            # 동시에 전환 — 도달 표시와 시간 정지가 어긋나지 않게 한다.
+            if ag.done:
+                if ag.reached:
+                    texts["status"].set_text("도달 완료 ✓")
+                    texts["status"].set_color("#0f7d3f")
+                    self._card_headers[i].set_facecolor(BG_HDR_REACHED)
+                else:
+                    texts["status"].set_text("타임아웃 ✗")
+                    texts["status"].set_color("#c83030")
+                    self._card_headers[i].set_facecolor(BG_HDR_TIMEOUT)
             elif ag._mode == "waiting":
                 texts["status"].set_text("신호 대기 ●")
                 texts["status"].set_color("#e03535")
@@ -515,10 +590,15 @@ class Simulator:
                 texts["status"].set_text("주행 중 ▶")
                 texts["status"].set_color("#d07010")
 
-            # 연료/속도는 link 진행 비율로 실시간 보간 → 매 frame 매끄럽게 갱신
+            # 시간 — 도달·종료한 agent 는 그 시점에서 정지, 진행 중은 global sim_time
+            disp_time = (ag.arrival_time if ag.done and ag.arrival_time is not None
+                         else self.sim_time)
+
+            # 연료/속도는 link 진행 비율로 실시간 보간 → 매 frame 매끄럽게 갱신.
+            # 도달·종료한 agent 는 속도 0 으로 고정(정지 상태).
             texts["fuel"].set_text(f"{ag.fuel_realtime():.1f} mL")
-            texts["time"].set_text(f"{self.sim_time:.1f} s")
-            texts["speed"].set_text(f"{ag.speed_kmh:.1f} km/h")
+            texts["time"].set_text(f"{disp_time:.1f} s")
+            texts["speed"].set_text(f"{0.0 if ag.done else ag.speed_kmh:.1f} km/h")
             texts["step"].set_text(str(ag.step_count))
 
     # ── 실시간 그래프 초기화 ────────────────────────────────────────────────
@@ -679,9 +759,12 @@ class Simulator:
         # 5 agents 동시 → radius offset 으로 동심원 형태 (겹침 방지)
         self.agent_dots:    list[plt.Line2D]     = []
         self.signal_wedges: list[mpatches.Wedge] = []
-        ring_base = max(env.map_diag / 60.0, 14.0)
+        # 신호 wedge 반지름·간격은 맵 좌표 단위. 절대 하한을 두면 좌표계가
+        # 작은 토폴로지(강남구 위경도, map_diag≈0.13)에서 맵보다 커져 화면을
+        # 가린다 → 항상 map_diag 에 비례시킨다 (격자 토폴로지 영향 없음).
+        ring_base = env.map_diag / 60.0
         self._ring_base   = ring_base
-        self._ring_offset = max(env.map_diag / 200.0, 4.0)  # agent 간 동심원 간격
+        self._ring_offset = env.map_diag / 200.0  # agent 간 동심원 간격
         wedge_lw = max(2.0, vp["density_scale"] * 3.5)
         for i, ag in enumerate(self.agents):
             color = MODEL_META[ag.name]["color"]
@@ -694,7 +777,7 @@ class Simulator:
                 center=(0, 0),
                 r=ring_base + i * self._ring_offset,
                 theta1=90, theta2=90,    # 시작은 0 도 (보이지 않음)
-                width=max(2.5, ring_base * 0.18),
+                width=ring_base * 0.18,
                 facecolor="#e03535", edgecolor="white",
                 linewidth=max(0.5, vp["density_scale"]),
                 alpha=0, zorder=9,
@@ -737,7 +820,103 @@ class Simulator:
             facecolor=BG_CARD, labelcolor=TEXT_DARK, edgecolor=GRID_CLR,
             framealpha=0.95, borderpad=0.8, title="모델", title_fontsize=8,
         )
-        ax.margins(0.06)
+        # 명시적 축 범위 — 노드 좌표 경계 기준. autoscale 에 의존하면 (0,0)
+        # 에 초기화된 신호 wedge patch 가 datalim 을 끌어당겨, 원점에서 먼
+        # 좌표계(강남구 위경도)에서 도로망이 구석으로 밀린다.
+        mx = max(env.map_w, 1e-9) * 0.06
+        my = max(env.map_h, 1e-9) * 0.06
+        ax.set_xlim(env.map_x_min - mx, env.map_x_max + mx)
+        ax.set_ylim(env.map_y_min - my, env.map_y_max + my)
+
+        # 미니맵 inset (camera != overview 시) — 전체맵 축소 + 카메라 viewport 사각형
+        self.minimap_ax = None
+        self.minimap_rect = None
+        self.minimap_dots: list[plt.Line2D] = []
+        if self._show_minimap:
+            self._init_minimap()
+
+    def _init_minimap(self):
+        env = self.ref_env
+        # map_ax 우하단 미니맵 inset
+        self.minimap_ax = self.map_ax.inset_axes([0.78, 0.02, 0.21, 0.24])
+        self.minimap_ax.set_xlim(env.map_x_min, env.map_x_max)
+        self.minimap_ax.set_ylim(env.map_y_min, env.map_y_max)
+        self.minimap_ax.set_aspect("equal")
+        self.minimap_ax.set_xticks([]); self.minimap_ax.set_yticks([])
+        self.minimap_ax.set_facecolor("#fafbfd")
+        for sp in self.minimap_ax.spines.values():
+            sp.set_edgecolor("#9ca0b3"); sp.set_linewidth(0.7)
+        # 링크 (옅은 회색) — 강남 1995노드도 픽셀 단위라 빠름
+        for lk in env.links.values():
+            p1 = env.nodes[str(lk["end1"])]["pos"]
+            p2 = env.nodes[str(lk["end2"])]["pos"]
+            self.minimap_ax.plot([p1[0], p2[0]], [p1[1], p2[1]],
+                                 color="#cfd2dc", lw=0.4, zorder=1,
+                                 solid_capstyle="round")
+        sp_pos = env.nodes[self.start]["pos"]
+        gp_pos = env.nodes[self.goal]["pos"]
+        self.minimap_ax.scatter(*sp_pos, c="#16c45e", s=22, marker="*",
+                                edgecolors="white", linewidths=0.4, zorder=4)
+        self.minimap_ax.scatter(*gp_pos, c="#f5a623", s=22, marker="*",
+                                edgecolors="white", linewidths=0.4, zorder=4)
+        # 카메라 뷰포트 사각형 (매 프레임 업데이트)
+        self.minimap_rect = mpatches.Rectangle(
+            (env.map_x_min, env.map_y_min), 1e-9, 1e-9,
+            edgecolor="#e03535", facecolor="#e0353520", lw=1.3, zorder=8,
+        )
+        self.minimap_ax.add_patch(self.minimap_rect)
+        # agent 위치 점
+        for ag in self.agents:
+            color = MODEL_META[ag.name]["color"]
+            dot, = self.minimap_ax.plot(
+                [], [], "o", color=color, ms=3.8,
+                markeredgecolor="white", markeredgewidth=0.4, zorder=6,
+            )
+            self.minimap_dots.append(dot)
+        # 라벨
+        self.minimap_ax.text(0.5, 1.02, "전체맵", transform=self.minimap_ax.transAxes,
+                             ha="center", va="bottom", fontsize=7,
+                             color=TEXT_MID, fontweight="bold")
+
+    # ── 카메라 / 미니맵 ────────────────────────────────────────────────────
+    def _update_camera(self):
+        """매 프레임 카메라 갱신 — overview 는 고정, fit 은 동적 fit-agents,
+        follow 는 --follow 모델 추적."""
+        if self._camera_mode == "overview":
+            return
+        if self._camera_mode == "follow" and self._follow_idx is not None:
+            ag = self.agents[self._follow_idx]
+            cx, cy = ag.pos
+            half = self._cam_min_half * 3.0
+        else:                                          # fit (동적 fit-agents)
+            xs = [ag.pos[0] for ag in self.agents]
+            ys = [ag.pos[1] for ag in self.agents]
+            cx = (min(xs) + max(xs)) / 2
+            cy = (min(ys) + max(ys)) / 2
+            half_w = (max(xs) - min(xs)) / 2 + self._cam_min_half
+            half_h = (max(ys) - min(ys)) / 2 + self._cam_min_half
+            half = max(half_w, half_h, self._cam_min_half)
+        # exponential smoothing — 프레임 간 카메라 jitter 감쇠
+        pcx, pcy, ph = self._cam_cur
+        a = 0.18
+        cx = pcx * (1 - a) + cx * a
+        cy = pcy * (1 - a) + cy * a
+        half = ph * (1 - a) + half * a
+        self._cam_cur = (cx, cy, half)
+        self.map_ax.set_xlim(cx - half, cx + half)
+        self.map_ax.set_ylim(cy - half, cy + half)
+
+    def _update_minimap(self):
+        if self.minimap_ax is None:
+            return
+        cx, cy, half = self._cam_cur
+        # 카메라 viewport 사각형
+        self.minimap_rect.set_xy((cx - half, cy - half))
+        self.minimap_rect.set_width(2 * half)
+        self.minimap_rect.set_height(2 * half)
+        # agent dots
+        for dot, ag in zip(self.minimap_dots, self.agents):
+            dot.set_data([ag.pos[0]], [ag.pos[1]])
 
     # ── 지도 업데이트 (프레임마다) ────────────────────────────────────────────
     def _update_map(self):
@@ -794,6 +973,10 @@ class Simulator:
                 wedge.set_facecolor(color)
                 wedge.set_alpha(0.85 if ag._mode == "waiting" else 0.72)
 
+        # 카메라 + 미니맵 — agent 위치 갱신 후 호출
+        self._update_camera()
+        self._update_minimap()
+
     # ── 애니메이션 프레임 ─────────────────────────────────────────────────────
     def _animate(self, frame: int):
         self._fc = frame
@@ -804,12 +987,12 @@ class Simulator:
         self._update_info_cards()
         self._update_graphs()
 
-        # GIF 프레임 캡처 (PIL 설치된 경우에만)
+        # GIF 프레임 캡처 (PIL 설치된 경우에만).
+        # 디코딩된 이미지 대신 PNG 바이트로 보관 → 메모리 사용량 수십 배 절감.
         if self.gif_path and _PIL_AVAILABLE:
             buf = io.BytesIO()
             self.fig.savefig(buf, format="png", dpi=72)
-            buf.seek(0)
-            self.gif_frames.append(_PILImage.open(buf).copy())
+            self.gif_frames.append(buf.getvalue())
             buf.close()
 
         if all(ag.done for ag in self.agents):
@@ -830,9 +1013,13 @@ class Simulator:
         gif_dir = Path(self.gif_path).parent
         gif_dir.mkdir(parents=True, exist_ok=True)
         print(f"\n  [GIF] 저장 중... ({len(self.gif_frames)} 프레임)")
-        self.gif_frames[0].save(
+        # PNG 바이트를 하나씩 lazily 디코딩 (generator) → 저장 시점에도
+        # 한 프레임만 메모리에 올라간다.
+        frames = (_PILImage.open(io.BytesIO(b)) for b in self.gif_frames)
+        first  = next(frames)
+        first.save(
             self.gif_path, save_all=True,
-            append_images=self.gif_frames[1:],
+            append_images=frames,
             duration=self.interval_ms, loop=0, optimize=False,
         )
         print(f"  [GIF] 저장 완료: {self.gif_path}")
@@ -852,8 +1039,7 @@ class Simulator:
             if _PIL_AVAILABLE:
                 buf = io.BytesIO()
                 self.fig.savefig(buf, format="png", dpi=72)
-                buf.seek(0)
-                self.gif_frames.append(_PILImage.open(buf).copy())
+                self.gif_frames.append(buf.getvalue())
                 buf.close()
 
             frame_idx += 1
@@ -899,14 +1085,20 @@ def main():
         ),
         formatter_class=argparse.RawTextHelpFormatter,
     )
+    # 경로 선택지는 config.yaml 의 routes 에서 동적으로 읽는다
+    # (토폴로지 전환 시 cross_* / gangnam_* 등 자동 반영).
+    try:
+        _cfg_routes = yaml.safe_load(open("config/config.yaml", encoding="utf-8"))
+        _route_choices = [r["name"] for r in _cfg_routes["experiments"]["routes"]]
+    except Exception:
+        _route_choices = ["cross_main"]
     parser.add_argument(
         "--models", nargs="+", default=["shortest_dijkstra", "rl_base"],
         metavar="MODEL",
         help=f"모델 선택 (공백 구분 / all=전체)\n선택지: {ALL_MODELS + ['all']}",
     )
-    parser.add_argument("--route", default="short_01",
-                        choices=["short_01", "short_02", "long_01", "long_02"],
-                        help="short_01/02=단거리, long_01/02=장거리")
+    parser.add_argument("--route", default=_route_choices[0],
+                        help="실험 경로 — --config 의 experiments.routes 에 정의된 경로 이름")
     parser.add_argument("--time_slot", default="off_peak",
                         choices=["off_peak", "peak"],
                         help="off_peak=07:00 한산, peak=08:00 병목")
@@ -933,6 +1125,26 @@ def main():
         "--gif_only", action="store_true",
         help="창 없이 GIF만 저장 (헤드리스 렌더링, --save_gif 자동 포함)",
     )
+    parser.add_argument(
+        "--camera", choices=["auto", "overview", "fit", "follow"], default="auto",
+        help=("카메라 모드.\n"
+              "  auto    = 격자=overview, 강남(>200노드)=fit (기본)\n"
+              "  overview= 전체 맵 고정 (격자 토폴로지에 적합)\n"
+              "  fit     = 동적 fit-agents (매 프레임 차량 bbox로 줌)\n"
+              "  follow  = --follow 모델 추적 (시네마틱)"),
+    )
+    parser.add_argument(
+        "--follow", default=None, metavar="MODEL",
+        help="--camera follow 시 추적할 모델 이름. 미지정 시 첫 모델.",
+    )
+    parser.add_argument(
+        "--no_minimap", action="store_true",
+        help="카메라 모드에서 전체맵 미니맵 inset 끄기",
+    )
+    parser.add_argument(
+        "--gif_name", default=None,
+        help="GIF 파일명(확장자 제외). 미지정 시 날짜 기반 자동 명명.",
+    )
     args = parser.parse_args()
     if args.gif_only:
         args.save_gif = True
@@ -953,13 +1165,17 @@ def main():
             print("[경고] Pillow 미설치 — pip install Pillow.  GIF 저장 건너뜀.")
         else:
             _abbr = {
-                "rl_signal_attention": "rla", "rl_signal": "rls",
-                "rl_base": "rlb", "shortest_dijkstra": "sdj",
-                "static_fuel_dijkstra": "fdj",
+                "rl_signal_attention": "rlattn", "rl_signal": "rls",
+                "rl_base": "rlb", "shortest_dijkstra": "short",
+                "static_fuel_dijkstra": "fuel",
             }
             ms = "_".join(_abbr.get(m, m) for m in model_names)
-            now_str = datetime.now().strftime("%Y%m%d_%H%M%S")
-            gif_name = f"{now_str}_{ms}_{args.route}_{args.time_slot}_x{args.speed}.gif"
+            if args.gif_name:
+                gif_name = f"{args.gif_name}.gif"
+            else:
+                now_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+                gif_name = (f"{now_str}_{ms}_{args.route}_"
+                            f"{args.time_slot}_x{args.speed}.gif")
             gif_path = str(ROOT / "output" / "gif" / gif_name)
 
     print(f"\n{'='*55}")
@@ -977,8 +1193,10 @@ def main():
     print(f"{'='*55}\n")
 
     Simulator(args.config, model_names, args.route, args.time_slot,
-              speed_mult=args.speed, gif_path=gif_path).run(args.interval,
-                                                            gif_only=args.gif_only)
+              speed_mult=args.speed, gif_path=gif_path,
+              camera_mode=args.camera, follow_model=args.follow,
+              show_minimap=not args.no_minimap).run(
+                  args.interval, gif_only=args.gif_only)
 
 
 if __name__ == "__main__":

@@ -108,8 +108,13 @@ def _movement_type(prev_pos, cur_pos, to_pos) -> str:
     if dot < 0 and abs(cross) < 0.1 * norm1 * norm2:
         return "uturn"
 
-    # 직진 임계: 외적이 매우 작으면 직진
-    if abs(cross) < 0.1 * norm1 * norm2:   # 약 6° 이내
+    # 직진 임계 (2026-05-22 개정: ±6° → ±30°).
+    #   기존 0.1(sin≈±5.7°)은 격자(0°·±90°)에는 충분하나, 강남구 실도로의
+    #   완만한 곡률(도로가 휘어도 같은 길)을 좌/우회전으로 오분류했다.
+    #   0.5(sin=±30°)로 확대해 실도로 곡률을 직진으로 올바르게 인정한다.
+    #   격자는 0°·±90° 뿐이라 영향 없음. dot>0 조건은 ±30° 확대가 180°
+    #   부근(near-uturn)을 직진으로 삼키지 않도록 하는 안전장치.
+    if dot > 0 and abs(cross) < 0.5 * norm1 * norm2:   # 약 ±30° 이내
         return "straight"
 
     return "left" if cross > 0 else "right"
@@ -136,16 +141,19 @@ def _phase_allows(phase_type: str, movement: str) -> bool:
 
 def _node_allows_left(node: dict) -> bool:
     """
-    좌회전 허용 여부. 다음 순서로 판정:
-      1. node['left_turn_allowed']  (signal_topology.py가 명시한 경우)
-      2. signal.phases에 left/left_turn type 존재 여부
-      3. 신호 없음 → 좌회전 허용 (이면도로 가정)
+    좌회전 허용 여부. 다음 순서로 판정 (2026-05-22 개정 — 신호 유무를 최우선):
+      1. 신호 없음 → 좌·직·우 모두 허용 (무신호 노드는 만능: 이면도로/비보호좌회전).
+         강남구 토폴로지는 무신호 노드에도 left_turn_allowed=false 가 일괄
+         명시돼 있어, 이 우선순위가 없으면 전 노드의 93%에서 좌회전이 막혀
+         Dijkstra 최단경로조차 실행 불가가 된다.
+      2. node['left_turn_allowed'] 명시값 (신호 노드 한정).
+      3. signal.phases 에 left/left_turn type 존재 여부.
     """
-    if "left_turn_allowed" in node:
-        return bool(node["left_turn_allowed"])
     sig = node.get("signal")
     if sig is None:
         return True
+    if "left_turn_allowed" in node:
+        return bool(node["left_turn_allowed"])
     return any(_phase_category(p["type"]) == "left" for p in sig["phases"])
 
 
@@ -396,19 +404,24 @@ class RoadNetworkEnv:
         self.start_time_sec = int((start_hour or self.default_start_hour) * 3600)
         self.current_time  = 0.0
         self.steps         = 0
+        self._last_link_speed_ms = None   # 직진 시 이어받을 직전 링크 순항속도
         self._goal_center  = self._calc_goal_center()
         return self._get_state()
 
     def get_valid_actions(self) -> list[str]:
         """
-        선택 가능한 다음 노드 목록.
+        선택 가능한 다음 노드 목록 (엣지-상대적 행동 공간).
 
         제외 규칙:
           1. U턴 (previous_node)
           2. 좌회전 불가 노드에서의 좌회전 이동
              (cur 노드의 좌회전 phase 부재 또는 left_turn_allowed=False)
 
-        정렬로 순서 고정 → State 패딩 일관성 유지.
+        정렬·절단 규칙:
+          나가는 엣지의 방위각(atan2)으로 오름차순 정렬 후 최대 K_HOP1 개로 절단.
+          → 슬롯 인덱스 k 가 토폴로지·노드 ID와 무관하게 "방위" 라는 물리적
+            의미를 갖는다 (엣지-상대적 행동 공간의 핵심). 모델 출력 슬롯 k 가
+            정확히 이 리스트의 k 번째 엣지에 대응 — State 1-hop 블록 순서와도 일치.
         """
         cur_node = self.nodes[self.current_node]
         cur_pos  = cur_node["pos"]
@@ -420,16 +433,27 @@ class RoadNetworkEnv:
 
         allow_left = _node_allows_left(cur_node)
 
+        # 막다른 노드(degree==1) 에서는 U턴 허용 — 실제 도로의 dead-end 행동 반영.
+        # 강남구 토폴로지의 degree-1 stub 397개(20%) 가 학습을 막던 함정 노드 문제 해소.
+        nbs_all = self.adj.get(self.current_node, [])
+        is_deadend = (len(nbs_all) <= 1)
+
         valid = []
-        for nb, _ in self.adj.get(self.current_node, []):
-            if nb == self.previous_node:
+        for nb, _ in nbs_all:
+            if nb == self.previous_node and not is_deadend:
                 continue
-            if prev_known and not allow_left:
+            if prev_known and not allow_left and nb != self.previous_node:
                 to_pos = self.nodes[nb]["pos"]
                 if _movement_type(prev_pos, cur_pos, to_pos) == "left":
                     continue
             valid.append(nb)
-        return sorted(valid)
+
+        def _bearing_key(nb: str) -> tuple[float, str]:
+            tx, ty = self.nodes[nb]["pos"]
+            return (math.atan2(ty - cur_pos[1], tx - cur_pos[0]), nb)
+
+        valid.sort(key=_bearing_key)
+        return valid[:K_HOP1]
 
     def step(self, action: str) -> tuple[np.ndarray, float, bool, dict]:
         # 링크 탐색
@@ -460,20 +484,27 @@ class RoadNetworkEnv:
         lk    = self.links[link_id]
         v_ms  = self._get_link_speed_ms(link_id, abs_depart)
 
-        # 진출 목표 속도: action 노드 신호 종류에 따라 회전 감속
-        next_sig = self.nodes[action].get("signal")
-        next_has_lt = next_sig and any(_phase_category(p["type"]) == "left"
-                                       for p in next_sig["phases"])
-        v_exit = (V_TURN_LEFT if next_has_lt
-                  else V_TURN_RIGHT if next_sig is not None
-                  else v_ms)
+        # 진입 속도 — 드라이버 운동 모델 (2026-05-21 개정):
+        #   · 좌/우회전 → 회전 감속 유지 (회전 속도로 진입 후 가속)
+        #   · 직진      → 노드에서의 명시적 감속 없음. 직전 링크 순항속도를
+        #                 이어받아 링크 간 속도 차이만큼만 가·감속.
+        if movement == "left":
+            v_entry = min(V_TURN_LEFT, v_ms)
+        elif movement == "right":
+            v_entry = min(V_TURN_RIGHT, v_ms)
+        else:                                   # straight / uturn / 에피소드 시작
+            v_entry = (self._last_link_speed_ms
+                       if self._last_link_speed_ms is not None else v_ms)
 
+        # 진출 속도 — 다음 회전은 미지이므로 명시적 노드 감속 없이 순항속도를
+        # 유지한다. 다음 회전의 감속은 다음 링크의 v_entry 로 반영된다.
         profile  = SpeedProfile(
             v_cruise = v_ms,
-            v_entry  = v_ms * 0.7,
-            v_exit   = min(v_exit, v_ms),
+            v_entry  = v_entry,
+            v_exit   = v_ms,
             link_len = lk["len"],
         )
+        self._last_link_speed_ms = v_ms          # 다음 직진 링크가 이어받을 속도
         t_travel = profile.total_time()
 
         # 연료 — VT-Micro 출력 L/s → mL 환산 (보상 스케일 정합)

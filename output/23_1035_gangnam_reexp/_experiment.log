@@ -1,0 +1,89 @@
+  실험 범위: route=['od1_hannam_suseo', 'od2_yangjae_yeongdong', 'od3_segok_samsung'] time_slot=['off_peak', 'peak'] repeat=30
+
+──────────────────────────────────────────────────
+ 모델: shortest_dijkstra
+  od1_hannam_suseo | off_peak | reach=30/30 | 진행 30/900 | ETA 157s
+  od1_hannam_suseo | peak | reach=30/30 | 진행 60/900 | ETA 151s
+  od2_yangjae_yeongdong | off_peak | reach=30/30 | 진행 90/900 | ETA 185s
+  od2_yangjae_yeongdong | peak | reach=30/30 | 진행 120/900 | ETA 196s
+  od3_segok_samsung | off_peak | reach=30/30 | 진행 150/900 | ETA 202s
+  od3_segok_samsung | peak | reach=30/30 | 진행 180/900 | ETA 202s
+
+──────────────────────────────────────────────────
+ 모델: static_fuel_dijkstra
+  od1_hannam_suseo | off_peak | reach=30/30 | 진행 210/900 | ETA 620s
+  od1_hannam_suseo | peak | reach=30/30 | 진행 240/900 | ETA 940s
+  od2_yangjae_yeongdong | off_peak | reach=30/30 | 진행 270/900 | ETA 1518s
+  od2_yangjae_yeongdong | peak | reach=30/30 | 진행 300/900 | ETA 2073s
+  od3_segok_samsung | off_peak | reach=30/30 | 진행 330/900 | ETA 2307s
+  od3_segok_samsung | peak | reach=30/30 | 진행 360/900 | ETA 2535s
+/home/hjj/2605_E-Nudge_traffic_RL_V2/venv/lib/python3.13/site-packages/torch/cuda/__init__.py:187: UserWarning: CUDA initialization: The NVIDIA driver on your system is too old (found version 12020). Please update your GPU driver by downloading and installing a new version from the URL: http://www.nvidia.com/Download/index.aspx Alternatively, go to: https://pytorch.org to install a PyTorch version that has been compiled with your version of the CUDA driver. (Triggered internally at /pytorch/c10/cuda/CUDAFunctions.cpp:119.)
+  return torch._C._cuda_getDeviceCount() > 0
+  [로드] models/model_rl_base.pth
+
+──────────────────────────────────────────────────
+ 모델: rl_base
+  od1_hannam_suseo | off_peak | reach=30/30 | 진행 390/900 | ETA 2211s
+  od1_hannam_suseo | peak | reach=30/30 | 진행 420/900 | ETA 1933s
+  od2_yangjae_yeongdong | off_peak | reach=30/30 | 진행 450/900 | ETA 1692s
+  od2_yangjae_yeongdong | peak | reach=30/30 | 진행 480/900 | ETA 1481s
+  od3_segok_samsung | off_peak | reach=0/30 | 진행 510/900 | ETA 1296s
+  od3_segok_samsung | peak | reach=0/30 | 진행 540/900 | ETA 1131s
+  [로드] models/model_rl_signal.pth
+
+──────────────────────────────────────────────────
+ 모델: rl_signal
+  od1_hannam_suseo | off_peak | reach=30/30 | 진행 570/900 | ETA 982s
+  od1_hannam_suseo | peak | reach=30/30 | 진행 600/900 | ETA 848s
+  od2_yangjae_yeongdong | off_peak | reach=30/30 | 진행 630/900 | ETA 727s
+  od2_yangjae_yeongdong | peak | reach=28/30 | 진행 660/900 | ETA 617s
+  od3_segok_samsung | off_peak | reach=0/30 | 진행 690/900 | ETA 517s
+  od3_segok_samsung | peak | reach=0/30 | 진행 720/900 | ETA 425s
+  [로드] models/model_rl_signal_attention.pth
+
+──────────────────────────────────────────────────
+ 모델: rl_signal_attention
+  od1_hannam_suseo | off_peak | reach=30/30 | 진행 750/900 | ETA 340s
+  od1_hannam_suseo | peak | reach=30/30 | 진행 780/900 | ETA 262s
+  od2_yangjae_yeongdong | off_peak | reach=30/30 | 진행 810/900 | ETA 189s
+  od2_yangjae_yeongdong | peak | reach=30/30 | 진행 840/900 | ETA 122s
+  od3_segok_samsung | off_peak | reach=0/30 | 진행 870/900 | ETA 59s
+  od3_segok_samsung | peak | reach=0/30 | 진행 900/900 | ETA 0s
+
+==================================================
+ 실험 완료 → output/23_1842
+ 전체 실행 수: 900
+ 소요 시간: 1711.9s
+
+모델                         경로         시간대        연료mL           시간s        대기s      스텝    도달    좌/직/우
+─────────────────────────────────────────────────────────────────────────────────────────────────────
+shortest_dijkstra          od1_hannam_suseo off_peak    1282.0±58.4    967.6    0.0  33.0  100%  2/28/3
+shortest_dijkstra          od1_hannam_suseo peak        1263.8±56.9   1042.0    0.0  33.0  100%  2/28/3
+shortest_dijkstra          od2_yangjae_yeongdong off_peak    1053.8±32.1   1378.6  488.6  60.0  100%  8/47/5
+shortest_dijkstra          od2_yangjae_yeongdong peak        1109.6±18.2   1594.3  609.7  60.0  100%  8/47/5
+shortest_dijkstra          od3_segok_samsung off_peak    1300.7±43.3   1525.4  567.4  63.0  100%  1/58/4
+shortest_dijkstra          od3_segok_samsung peak        1378.5±31.1   1730.2  629.0  63.0  100%  1/58/4
+static_fuel_dijkstra       od1_hannam_suseo off_peak    1154.0±36.5    865.9    0.0  27.0  100%  1/24/2
+static_fuel_dijkstra       od1_hannam_suseo peak        1180.8±35.8    943.8    0.0  27.0  100%  1/24/2
+static_fuel_dijkstra       od2_yangjae_yeongdong off_peak    1003.3±29.4   1214.8  278.1  59.9  100%  7/47/6
+static_fuel_dijkstra       od2_yangjae_yeongdong peak        1025.5±40.6   1304.3  256.9  68.5  100%  11/50/8
+static_fuel_dijkstra       od3_segok_samsung off_peak    1225.7±52.3   1348.7  415.2  59.1  100%  5/47/7
+static_fuel_dijkstra       od3_segok_samsung peak        1275.7±38.6   1563.8  477.8  62.6  100%  5/50/7
+rl_base                    od1_hannam_suseo off_peak    1204.9±127.0   897.6   10.3  29.3  100%  2/25/3
+rl_base                    od1_hannam_suseo peak        1230.0±118.5   972.1    0.0  29.0  100%  2/24/3
+rl_base                    od2_yangjae_yeongdong off_peak    1227.1±79.8   1511.4  536.2  76.8  100%  15/50/12
+rl_base                    od2_yangjae_yeongdong peak        1157.4±100.5  1517.4  446.7  73.1  100%  14/47/12
+rl_base                    od3_segok_samsung off_peak     857.3±75.9    685.1    8.3  200.0    0%  168/23/9
+rl_base                    od3_segok_samsung peak         765.2±254.0   780.9   85.3  200.0    0%  169/20/11
+rl_signal                  od1_hannam_suseo off_peak    1176.2±90.8    877.5    0.0  27.8  100%  1/23/3
+rl_signal                  od1_hannam_suseo peak        1176.0±68.2    934.6    0.0  27.4  100%  1/24/2
+rl_signal                  od2_yangjae_yeongdong off_peak    1176.6±194.8  1473.5  485.8  72.6  100%  12/52/8
+rl_signal                  od2_yangjae_yeongdong peak        1341.6±531.1  1718.0  505.6  93.3   93%  27/53/13
+rl_signal                  od3_segok_samsung off_peak     839.5±63.0    670.6    9.4  200.0    0%  167/26/7
+rl_signal                  od3_segok_samsung peak         722.1±78.1    737.3   70.6  200.0    0%  172/20/7
+rl_signal_attention        od1_hannam_suseo off_peak    1191.2±90.4    896.7    0.8  27.7  100%  2/24/3
+rl_signal_attention        od1_hannam_suseo peak        1222.7±129.8   982.1    7.1  28.9  100%  2/24/3
+rl_signal_attention        od2_yangjae_yeongdong off_peak    1124.9±54.3   1422.8  505.9  65.3  100%  11/46/9
+rl_signal_attention        od2_yangjae_yeongdong peak        1170.9±126.5  1523.7  461.6  75.9  100%  19/46/11
+rl_signal_attention        od3_segok_samsung off_peak     835.6±54.8    687.1   11.7  200.0    0%  170/24/7
+rl_signal_attention        od3_segok_samsung peak         718.7±77.9    728.3   68.7  200.0    0%  172/21/8

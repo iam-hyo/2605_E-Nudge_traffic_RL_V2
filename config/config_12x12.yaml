@@ -1,0 +1,70 @@
+# config_12x12.yaml
+# 12x12 중간 규모 테스트베드 전용 설정 (중간 발표).
+# 학습:  python -c "from train._train_common import train_rl; ..."  (config 인자 전달)
+# 실험:  python -c "from experiments.run_experiment import main; main('config/config_12x12.yaml')"
+data:
+  topology: data/12x12_topology.json
+  speed: data/12x12_speed_data.csv
+experiments:
+  models:
+    shortest_dijkstra: true
+    static_fuel_dijkstra: true
+    rl_base: true
+    rl_signal: true
+    rl_signal_attention: true
+  repeat: 30
+  routes:
+  - {name: diag_main, start: '1',   goal: '144', type: long}   # 주 실험 경로 (코너→코너)
+  - {name: aux_v,     start: '1',   goal: '133', type: long}   # 좌변 종주
+  - {name: aux_h,     start: '1',   goal: '12',  type: long}   # 하변 종주
+  - {name: aux_anti,  start: '13',  goal: '132', type: long}   # 사선 반대
+  - {name: aux_mid,   start: '7',   goal: '138', type: long}   # 중앙 종단
+  - {name: cur_lo,    start: '1',   goal: '66',  type: short}  # 커리큘럼: 출발→중앙
+  - {name: cur_hi,    start: '79',  goal: '144', type: short}  # 커리큘럼: 중앙→목적
+  - {name: cur_mid,   start: '13',  goal: '90',  type: short}  # 커리큘럼: 중거리
+  time_slots:
+  - {label: off_peak, start_hour: 7.0}
+  - {label: peak,     start_hour: 8.0}
+  # 실제 실험 범위: 주 경로 1→144 · 첨두 08:00 · 30회
+  experiment_route: diag_main
+  experiment_time_slot: peak
+output:
+  model_dir: models
+  result_dir: output
+physics:
+  accel_ms2: 2.5
+  ifc_ml_s: 0.5
+  speed_min_kmh: 5.0
+  speed_noise: 0.2
+  v_turn_left_kmh: 30.0
+  v_turn_right_kmh: 20.0
+reward:
+  alpha: 1.0
+  arrival_bonus: 200.0
+  penalty_dead: 0.0
+  penalty_timeout: 0.0
+train:
+  batch_size: 128
+  checkpoint_every: 1500
+  episodes: 4000
+  epsilon_decay: 0.9999
+  epsilon_min: 0.05
+  epsilon_start: 1.0
+  gamma: 0.97
+  log_interval: 100
+  lr: 0.0005
+  memory_size: 50000
+  multi_route: true
+  # 144노드 대형맵 — 포텐셜 기반 shaping 으로 탐색 가속.
+  # 텔레스코핑 합이 경로 무관(시작-목표 거리에만 의존)이라 최소연료 최적해는 불변.
+  shaping_weight: 500.0
+  target_update: 25
+  warmup_steps: 1500
+  train_max_steps: 220
+  # 12x12 단일 토폴로지 집중 학습 (중간 발표용). 강남구 전이는 후속 단계.
+  topologies:
+  - topology: data/12x12_topology.json
+    speed: data/12x12_speed_data.csv
+    weight: 1.0
+    use_config_routes: true
+    primary_boost: 5

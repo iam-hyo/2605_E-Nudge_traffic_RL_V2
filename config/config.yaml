@@ -1,6 +1,7 @@
 data:
-  speed: data/6x6_speed_data.csv
-  topology: data/6x6_cross_topology.json
+  # 주 실험 토폴로지 (run_experiment.py / simulation.py 가 사용)
+  topology: data/gangnam_clean_topology.json
+  speed: data/gangnam_clean_speed_data.csv
 experiments:
   models:
     rl_base: true
@@ -9,31 +10,38 @@ experiments:
     shortest_dijkstra: true
     static_fuel_dijkstra: true
   repeat: 30
+  # routes / time_slots = 학습 다양성용 (6x6_cross 내부).
+  # 실제 실험 범위는 experiment_route / experiment_time_slot 으로 별도 지정.
   routes:
-  # 6x6 cross 사선 토폴로지 — 핵심 case: 1→36
-  #  · B 사선(명시적 최단, 거리 3884m, 신호 불리)  ← Shortest 선택
-  #  · C 사선(명시적 비최단, 거리 4200m, 신호 우호) ← Signal-aware 가 선택해야
-  - goal: '36'
+  - goal: '36'                 # 핵심: 1→36 (col 2 = 최장·신호우호 채택 유도)
     name: cross_main
     start: '1'
     type: long
-  - goal: '33'                 # 보조: C 사선 종점 (학습 다양성)
+  - goal: '33'
     name: cross_aux1
     start: '3'
     type: long
-  - goal: '32'                 # 보조: B 사선 종점
+  - goal: '32'
     name: cross_aux2
     start: '2'
     type: long
-  - goal: '31'                 # 보조: 좌변 사선
+  - goal: '31'
     name: cross_aux3
     start: '1'
+    type: long
+  # ── 강남구 실험 경로 (metadata start/goal, 최단 26링크·5332m) ──
+  - goal: '647033'
+    name: gangnam_main
+    start: '111357'
     type: long
   time_slots:
   - label: off_peak
     start_hour: 7.0
   - label: peak
     start_hour: 8.0
+  # ── 실제 실험 범위 (사용자 지정: 경로 하나 · 피크타임 · 30회) ──
+  experiment_route: gangnam_main
+  experiment_time_slot: peak
 output:
   model_dir: models
   result_dir: output
@@ -46,14 +54,14 @@ physics:
   v_turn_right_kmh: 20.0
 reward:
   alpha: 1.0           # 연료 패널티 계수 (mL 기준)
-  arrival_bonus: 200.0   # 0520_2: 500→200, fuel 절감 인센티브 강화
-  penalty_dead: 0.0    # 단일화: 도착 보너스 미수령이 자연 패널티
+  arrival_bonus: 200.0
+  penalty_dead: 0.0
   penalty_timeout: 0.0
 train:
   batch_size: 128
-  checkpoint_every: 300
-  episodes: 1500         # 0520_2 case study: 800→1500 로 학습 강화
-  epsilon_decay: 0.997
+  checkpoint_every: 600
+  episodes: 2400
+  epsilon_decay: 0.9999
   epsilon_min: 0.05
   epsilon_start: 1.0
   gamma: 0.97
@@ -61,6 +69,23 @@ train:
   lr: 0.0005
   memory_size: 50000
   multi_route: true
-  shaping_weight: 0.0  # 단일화: 연료 + 도착만으로 학습 (potential-based shaping 비활성화)
+  shaping_weight: 0.0
   target_update: 25
   warmup_steps: 1500
+  # ── 다중 토폴로지 학습 (엣지-상대적 행동 공간으로 가능해짐) ──
+  # 매 에피소드 weight 비례로 토폴로지 선택 → 한 모델이 여러 도로망을 동시 학습.
+  train_max_steps: 120          # 학습 시 에피소드 길이 상한 (토폴로지 공통)
+  topologies:
+  - topology: data/6x6_cross_topology.json
+    speed: data/6x6_cross_speed_data.csv
+    weight: 0.60
+    use_config_routes: true
+    primary_boost: 2            # 주 실험 경로(cross_main) 추가 복제 → 학습 비중 ↑
+  - topology: data/10x10_topology.json
+    speed: data/10x10_speed_data.csv
+    weight: 0.22
+    n_random_routes: 16
+  - topology: data/gangnam_clean_topology.json
+    speed: data/gangnam_clean_speed_data.csv
+    weight: 0.18
+    n_random_routes: 20
