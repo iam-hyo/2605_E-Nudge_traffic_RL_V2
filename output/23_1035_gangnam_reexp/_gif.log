@@ -1,0 +1,25 @@
+
+=======================================================
+  최소 연료 경로 탐색 - 시뮬레이션
+=======================================================
+  ①  shortest_dijkstra
+  ⑤  rl_signal_attention
+
+  경로   : od1_hannam_suseo
+  시간대 : 08:00 병목
+  FPS    : 30  |  배속: 4x  |  링크당: 198ms
+  GIF    : /home/hjj/2605_E-Nudge_traffic_RL_V2/output/gif/gangnam_short_rlattn.gif
+
+  신호 준수: 적색=정지(우회전 포함), 녹색=통과, 파랑=좌회전통과
+  ③ rl_base: 경로 탐색 시 신호 미사용, 운행 중 교통법규 준수
+=======================================================
+
+/home/hjj/2605_E-Nudge_traffic_RL_V2/venv/lib/python3.13/site-packages/torch/cuda/__init__.py:187: UserWarning: CUDA initialization: The NVIDIA driver on your system is too old (found version 12020). Please update your GPU driver by downloading and installing a new version from the URL: http://www.nvidia.com/Download/index.aspx Alternatively, go to: https://pytorch.org to install a PyTorch version that has been compiled with your version of the CUDA driver. (Triggered internally at /pytorch/c10/cuda/CUDAFunctions.cpp:119.)
+  return torch._C._cuda_getDeviceCount() > 0
+  [로드] model_rl_signal_attention.pth
+  [GIF] 헤드리스 렌더링 시작...
+  [GIF] 프레임 200...
+  [GIF] 프레임 400...
+
+  [GIF] 저장 중... (565 프레임)
+  [GIF] 저장 완료: /home/hjj/2605_E-Nudge_traffic_RL_V2/output/gif/gangnam_short_rlattn.gif

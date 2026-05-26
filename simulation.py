@@ -404,7 +404,10 @@ class _AgentState:
 class Simulator:
     def __init__(self, cfg_path: str, model_names: list[str],
                  route_name: str, time_slot: str, speed_mult: int = 1,
-                 gif_path: str | None = None):
+                 gif_path: str | None = None,
+                 camera_mode: str = "auto",
+                 follow_model: str | None = None,
+                 show_minimap: bool = True):
         self.cfg = yaml.safe_load(open(cfg_path, encoding="utf-8"))
         routes   = {r["name"]: r for r in self.cfg["experiments"]["routes"]}
         tslots   = {t["label"]: t for t in self.cfg["experiments"]["time_slots"]}
@@ -445,6 +448,26 @@ class Simulator:
         # speed_mult N → sim_dt = 0.5 * N. (예: link 30s = 60/N frames at 30fps)
         self.sim_time = 0.0
         self.sim_dt   = 0.5 * speed_mult
+
+        # 카메라 설정 — auto: 강남 규모(>200노드) 면 동적 fit, 격자면 overview.
+        if camera_mode == "auto":
+            camera_mode = "fit" if self.ref_env.N > 200 else "overview"
+        self._camera_mode  = camera_mode
+        self._show_minimap = show_minimap and (camera_mode != "overview")
+        self._follow_idx   = None
+        if camera_mode == "follow":
+            if follow_model:
+                for i, ag in enumerate(self.agents):
+                    if ag.name == follow_model:
+                        self._follow_idx = i; break
+            if self._follow_idx is None:
+                self._follow_idx = 0
+        env = self.ref_env
+        # 카메라 최소 반지름 — 맵 대각의 1.8% (강남 위경도 좌표에서 약 250m 상당)
+        self._cam_min_half = env.map_diag * 0.018
+        cx0 = (env.map_x_min + env.map_x_max) / 2
+        cy0 = (env.map_y_min + env.map_y_max) / 2
+        self._cam_cur = (cx0, cy0, max(env.map_w, env.map_h) / 2)
 
         self._build_figure()
 
@@ -805,6 +828,96 @@ class Simulator:
         ax.set_xlim(env.map_x_min - mx, env.map_x_max + mx)
         ax.set_ylim(env.map_y_min - my, env.map_y_max + my)
 
+        # 미니맵 inset (camera != overview 시) — 전체맵 축소 + 카메라 viewport 사각형
+        self.minimap_ax = None
+        self.minimap_rect = None
+        self.minimap_dots: list[plt.Line2D] = []
+        if self._show_minimap:
+            self._init_minimap()
+
+    def _init_minimap(self):
+        env = self.ref_env
+        # map_ax 우하단 미니맵 inset
+        self.minimap_ax = self.map_ax.inset_axes([0.78, 0.02, 0.21, 0.24])
+        self.minimap_ax.set_xlim(env.map_x_min, env.map_x_max)
+        self.minimap_ax.set_ylim(env.map_y_min, env.map_y_max)
+        self.minimap_ax.set_aspect("equal")
+        self.minimap_ax.set_xticks([]); self.minimap_ax.set_yticks([])
+        self.minimap_ax.set_facecolor("#fafbfd")
+        for sp in self.minimap_ax.spines.values():
+            sp.set_edgecolor("#9ca0b3"); sp.set_linewidth(0.7)
+        # 링크 (옅은 회색) — 강남 1995노드도 픽셀 단위라 빠름
+        for lk in env.links.values():
+            p1 = env.nodes[str(lk["end1"])]["pos"]
+            p2 = env.nodes[str(lk["end2"])]["pos"]
+            self.minimap_ax.plot([p1[0], p2[0]], [p1[1], p2[1]],
+                                 color="#cfd2dc", lw=0.4, zorder=1,
+                                 solid_capstyle="round")
+        sp_pos = env.nodes[self.start]["pos"]
+        gp_pos = env.nodes[self.goal]["pos"]
+        self.minimap_ax.scatter(*sp_pos, c="#16c45e", s=22, marker="*",
+                                edgecolors="white", linewidths=0.4, zorder=4)
+        self.minimap_ax.scatter(*gp_pos, c="#f5a623", s=22, marker="*",
+                                edgecolors="white", linewidths=0.4, zorder=4)
+        # 카메라 뷰포트 사각형 (매 프레임 업데이트)
+        self.minimap_rect = mpatches.Rectangle(
+            (env.map_x_min, env.map_y_min), 1e-9, 1e-9,
+            edgecolor="#e03535", facecolor="#e0353520", lw=1.3, zorder=8,
+        )
+        self.minimap_ax.add_patch(self.minimap_rect)
+        # agent 위치 점
+        for ag in self.agents:
+            color = MODEL_META[ag.name]["color"]
+            dot, = self.minimap_ax.plot(
+                [], [], "o", color=color, ms=3.8,
+                markeredgecolor="white", markeredgewidth=0.4, zorder=6,
+            )
+            self.minimap_dots.append(dot)
+        # 라벨
+        self.minimap_ax.text(0.5, 1.02, "전체맵", transform=self.minimap_ax.transAxes,
+                             ha="center", va="bottom", fontsize=7,
+                             color=TEXT_MID, fontweight="bold")
+
+    # ── 카메라 / 미니맵 ────────────────────────────────────────────────────
+    def _update_camera(self):
+        """매 프레임 카메라 갱신 — overview 는 고정, fit 은 동적 fit-agents,
+        follow 는 --follow 모델 추적."""
+        if self._camera_mode == "overview":
+            return
+        if self._camera_mode == "follow" and self._follow_idx is not None:
+            ag = self.agents[self._follow_idx]
+            cx, cy = ag.pos
+            half = self._cam_min_half * 3.0
+        else:                                          # fit (동적 fit-agents)
+            xs = [ag.pos[0] for ag in self.agents]
+            ys = [ag.pos[1] for ag in self.agents]
+            cx = (min(xs) + max(xs)) / 2
+            cy = (min(ys) + max(ys)) / 2
+            half_w = (max(xs) - min(xs)) / 2 + self._cam_min_half
+            half_h = (max(ys) - min(ys)) / 2 + self._cam_min_half
+            half = max(half_w, half_h, self._cam_min_half)
+        # exponential smoothing — 프레임 간 카메라 jitter 감쇠
+        pcx, pcy, ph = self._cam_cur
+        a = 0.18
+        cx = pcx * (1 - a) + cx * a
+        cy = pcy * (1 - a) + cy * a
+        half = ph * (1 - a) + half * a
+        self._cam_cur = (cx, cy, half)
+        self.map_ax.set_xlim(cx - half, cx + half)
+        self.map_ax.set_ylim(cy - half, cy + half)
+
+    def _update_minimap(self):
+        if self.minimap_ax is None:
+            return
+        cx, cy, half = self._cam_cur
+        # 카메라 viewport 사각형
+        self.minimap_rect.set_xy((cx - half, cy - half))
+        self.minimap_rect.set_width(2 * half)
+        self.minimap_rect.set_height(2 * half)
+        # agent dots
+        for dot, ag in zip(self.minimap_dots, self.agents):
+            dot.set_data([ag.pos[0]], [ag.pos[1]])
+
     # ── 지도 업데이트 (프레임마다) ────────────────────────────────────────────
     def _update_map(self):
         env = self.ref_env
@@ -859,6 +972,10 @@ class Simulator:
                 wedge.set_theta2(90.0)
                 wedge.set_facecolor(color)
                 wedge.set_alpha(0.85 if ag._mode == "waiting" else 0.72)
+
+        # 카메라 + 미니맵 — agent 위치 갱신 후 호출
+        self._update_camera()
+        self._update_minimap()
 
     # ── 애니메이션 프레임 ─────────────────────────────────────────────────────
     def _animate(self, frame: int):
@@ -1008,6 +1125,26 @@ def main():
         "--gif_only", action="store_true",
         help="창 없이 GIF만 저장 (헤드리스 렌더링, --save_gif 자동 포함)",
     )
+    parser.add_argument(
+        "--camera", choices=["auto", "overview", "fit", "follow"], default="auto",
+        help=("카메라 모드.\n"
+              "  auto    = 격자=overview, 강남(>200노드)=fit (기본)\n"
+              "  overview= 전체 맵 고정 (격자 토폴로지에 적합)\n"
+              "  fit     = 동적 fit-agents (매 프레임 차량 bbox로 줌)\n"
+              "  follow  = --follow 모델 추적 (시네마틱)"),
+    )
+    parser.add_argument(
+        "--follow", default=None, metavar="MODEL",
+        help="--camera follow 시 추적할 모델 이름. 미지정 시 첫 모델.",
+    )
+    parser.add_argument(
+        "--no_minimap", action="store_true",
+        help="카메라 모드에서 전체맵 미니맵 inset 끄기",
+    )
+    parser.add_argument(
+        "--gif_name", default=None,
+        help="GIF 파일명(확장자 제외). 미지정 시 날짜 기반 자동 명명.",
+    )
     args = parser.parse_args()
     if args.gif_only:
         args.save_gif = True
@@ -1028,13 +1165,17 @@ def main():
             print("[경고] Pillow 미설치 — pip install Pillow.  GIF 저장 건너뜀.")
         else:
             _abbr = {
-                "rl_signal_attention": "rla", "rl_signal": "rls",
-                "rl_base": "rlb", "shortest_dijkstra": "sdj",
-                "static_fuel_dijkstra": "fdj",
+                "rl_signal_attention": "rlattn", "rl_signal": "rls",
+                "rl_base": "rlb", "shortest_dijkstra": "short",
+                "static_fuel_dijkstra": "fuel",
             }
             ms = "_".join(_abbr.get(m, m) for m in model_names)
-            now_str = datetime.now().strftime("%Y%m%d_%H%M%S")
-            gif_name = f"{now_str}_{ms}_{args.route}_{args.time_slot}_x{args.speed}.gif"
+            if args.gif_name:
+                gif_name = f"{args.gif_name}.gif"
+            else:
+                now_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+                gif_name = (f"{now_str}_{ms}_{args.route}_"
+                            f"{args.time_slot}_x{args.speed}.gif")
             gif_path = str(ROOT / "output" / "gif" / gif_name)
 
     print(f"\n{'='*55}")
@@ -1052,8 +1193,10 @@ def main():
     print(f"{'='*55}\n")
 
     Simulator(args.config, model_names, args.route, args.time_slot,
-              speed_mult=args.speed, gif_path=gif_path).run(args.interval,
-                                                            gif_only=args.gif_only)
+              speed_mult=args.speed, gif_path=gif_path,
+              camera_mode=args.camera, follow_model=args.follow,
+              show_minimap=not args.no_minimap).run(
+                  args.interval, gif_only=args.gif_only)
 
 
 if __name__ == "__main__":

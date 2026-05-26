@@ -108,8 +108,13 @@ def _movement_type(prev_pos, cur_pos, to_pos) -> str:
     if dot < 0 and abs(cross) < 0.1 * norm1 * norm2:
         return "uturn"
 
-    # 직진 임계: 외적이 매우 작으면 직진
-    if abs(cross) < 0.1 * norm1 * norm2:   # 약 6° 이내
+    # 직진 임계 (2026-05-22 개정: ±6° → ±30°).
+    #   기존 0.1(sin≈±5.7°)은 격자(0°·±90°)에는 충분하나, 강남구 실도로의
+    #   완만한 곡률(도로가 휘어도 같은 길)을 좌/우회전으로 오분류했다.
+    #   0.5(sin=±30°)로 확대해 실도로 곡률을 직진으로 올바르게 인정한다.
+    #   격자는 0°·±90° 뿐이라 영향 없음. dot>0 조건은 ±30° 확대가 180°
+    #   부근(near-uturn)을 직진으로 삼키지 않도록 하는 안전장치.
+    if dot > 0 and abs(cross) < 0.5 * norm1 * norm2:   # 약 ±30° 이내
         return "straight"
 
     return "left" if cross > 0 else "right"
@@ -136,16 +141,19 @@ def _phase_allows(phase_type: str, movement: str) -> bool:
 
 def _node_allows_left(node: dict) -> bool:
     """
-    좌회전 허용 여부. 다음 순서로 판정:
-      1. node['left_turn_allowed']  (signal_topology.py가 명시한 경우)
-      2. signal.phases에 left/left_turn type 존재 여부
-      3. 신호 없음 → 좌회전 허용 (이면도로 가정)
+    좌회전 허용 여부. 다음 순서로 판정 (2026-05-22 개정 — 신호 유무를 최우선):
+      1. 신호 없음 → 좌·직·우 모두 허용 (무신호 노드는 만능: 이면도로/비보호좌회전).
+         강남구 토폴로지는 무신호 노드에도 left_turn_allowed=false 가 일괄
+         명시돼 있어, 이 우선순위가 없으면 전 노드의 93%에서 좌회전이 막혀
+         Dijkstra 최단경로조차 실행 불가가 된다.
+      2. node['left_turn_allowed'] 명시값 (신호 노드 한정).
+      3. signal.phases 에 left/left_turn type 존재 여부.
     """
-    if "left_turn_allowed" in node:
-        return bool(node["left_turn_allowed"])
     sig = node.get("signal")
     if sig is None:
         return True
+    if "left_turn_allowed" in node:
+        return bool(node["left_turn_allowed"])
     return any(_phase_category(p["type"]) == "left" for p in sig["phases"])
 
 
@@ -425,11 +433,16 @@ class RoadNetworkEnv:
 
         allow_left = _node_allows_left(cur_node)
 
+        # 막다른 노드(degree==1) 에서는 U턴 허용 — 실제 도로의 dead-end 행동 반영.
+        # 강남구 토폴로지의 degree-1 stub 397개(20%) 가 학습을 막던 함정 노드 문제 해소.
+        nbs_all = self.adj.get(self.current_node, [])
+        is_deadend = (len(nbs_all) <= 1)
+
         valid = []
-        for nb, _ in self.adj.get(self.current_node, []):
-            if nb == self.previous_node:
+        for nb, _ in nbs_all:
+            if nb == self.previous_node and not is_deadend:
                 continue
-            if prev_known and not allow_left:
+            if prev_known and not allow_left and nb != self.previous_node:
                 to_pos = self.nodes[nb]["pos"]
                 if _movement_type(prev_pos, cur_pos, to_pos) == "left":
                     continue

@@ -63,8 +63,9 @@ class GangnamMap:
         self.nodes = {str(n["id"]): n for n in topo["nodes"]}
         self.links = [(str(l["end1"]), str(l["end2"])) for l in topo["links"]]
 
-        lats = [n["pos"][0] for n in self.nodes.values()]
-        lons = [n["pos"][1] for n in self.nodes.values()]
+        # gangnam_clean_topology.json 은 pos = [경도(x), 위도(y)] 규약.
+        lons = [n["pos"][0] for n in self.nodes.values()]
+        lats = [n["pos"][1] for n in self.nodes.values()]
         self.lat0, self.lon0 = sum(lats) / len(lats), sum(lons) / len(lons)
         self._mx = math.cos(math.radians(self.lat0)) * 111_320.0
         self._my = 110_540.0
@@ -78,7 +79,7 @@ class GangnamMap:
             self.deg[e2] += 1
 
     def _proj(self, pos):
-        lat, lon = pos
+        lon, lat = pos
         return ((lon - self.lon0) * self._mx, (lat - self.lat0) * self._my)
 
     def left_ok(self, nid: str) -> bool:

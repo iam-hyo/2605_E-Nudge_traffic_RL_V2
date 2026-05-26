@@ -39,68 +39,101 @@ class _DijkstraBase:
 
 class ShortestDijkstra(_DijkstraBase):
     """
-    링크 길이 기준 최단 경로.
-    매 스텝 전체 그래프에서 Dijkstra 수행 → 다음 노드 반환.
+    회전제한 인지 최단거리 Dijkstra — "신호 준수 최단거리".
+
+    2026-05-23 개정: 기존 무방향-그래프 Dijkstra 는 신호 노드의 회전제한
+    (좌회전 금지)을 모르고 최단경로를 계산해, 강남구 OD-2(양재→영동대교)
+    같은 사례에서 통행불가 좌회전이 포함된 경로를 반환 → 에이전트가
+    `get_valid_actions` 에서 그 경로를 따라갈 수 없어 탈선·미도달했다.
+
+    본 버전은 `StaticFuelDijkstra` 와 동일하게:
+      · state = (현재 노드, 진입 노드) — 진입 방향에 따라 다음 허용 회전이
+        달라지므로 prev 를 함께 추적.
+      · 노드 u 에서 좌회전이 금지(`_node_allows_left(u)==False`)이고
+        진입 prev 가 알려져 있을 때, _movement_type(prev,u,next)=='left'
+        간선을 확장에서 제외.
+      · U턴(다음 노드 == prev) 차단.
+    결과: 모든 모델이 따르는 `env.get_valid_actions` 와 정합한, 실제로
+    주행 가능한 **최단거리** 경로를 계산한다 (회전제한 인지 후에도
+    여전히 거리 최소화가 목적).
     """
 
     def __init__(self, env):
         self.env = env
 
-    def _run(self, src: str, goals: set[str]) -> dict[str, str]:
-        """src → 각 노드 최단 경로 prev 테이블 반환."""
-        dist = {src: 0.0}
-        prev: dict[str, Optional[str]] = {src: None}
-        pq   = [(0.0, src)]
+    def _run(self, src: str, src_prev: Optional[str] = None
+             ) -> tuple[dict, dict]:
+        """src(진입 prev=src_prev) 에서 도달 가능한 (node, prev) 상태 최단 거리.
+
+        반환:
+          dist: {(node, prev): cum_distance}
+          prev_state: {(node, prev): predecessor_state or None}
+        """
+        init = (src, src_prev)
+        dist: dict[tuple, float] = {init: 0.0}
+        prev_state: dict[tuple, Optional[tuple]] = {init: None}
+        pq = [(0.0, src, src_prev)]
 
         while pq:
-            d, u = heapq.heappop(pq)
-            if d > dist.get(u, float("inf")):
+            d, u, u_prev = heapq.heappop(pq)
+            st = (u, u_prev)
+            if d > dist.get(st, float("inf")):
                 continue
-            for v, lid in self.env.adj.get(u, []):
+            u_node = self.env.nodes[u]
+            u_left_ok = _node_allows_left(u_node)
+            u_pos = u_node["pos"]
+            prev_pos = (self.env.nodes[u_prev]["pos"]
+                        if u_prev and u_prev != u and u_prev in self.env.nodes
+                        else None)
+            nbs_all = self.env.adj.get(u, [])
+            is_deadend = (len(nbs_all) <= 1)            # degree-1 stub
+            for nb, lid in nbs_all:
+                # U턴 — degree-1 dead-end 에서만 허용 (env.get_valid_actions 와 정합).
+                if nb == u_prev and not is_deadend:
+                    continue
+                # 좌회전 금지 노드의 좌회전 간선 제외 (U턴은 좌회전 분류 대상 아님)
+                if (not u_left_ok and prev_pos is not None
+                        and nb != u_prev):
+                    if _movement_type(prev_pos, u_pos,
+                                      self.env.nodes[nb]["pos"]) == "left":
+                        continue
                 nd = d + self.env.links[lid]["len"]
-                if nd < dist.get(v, float("inf")):
-                    dist[v] = nd
-                    prev[v]  = u
-                    heapq.heappush(pq, (nd, v))
-        return prev
+                nb_state = (nb, u)
+                if nd < dist.get(nb_state, float("inf")):
+                    dist[nb_state] = nd
+                    prev_state[nb_state] = st
+                    heapq.heappush(pq, (nd, nb, u))
+        return dist, prev_state
 
     def act(self, state: np.ndarray, valid_actions: list[str]) -> str:
-        src   = self.env.current_node
-        goals = set(self.env.goal_nodes)
-        prev  = self._run(src, goals)
+        src      = self.env.current_node
+        src_prev = (self.env.previous_node
+                    if self.env.previous_node != src else None)
+        goals    = set(self.env.goal_nodes)
 
-        # 목표 중 도달 가능한 것 선택
-        reachable = [(g, self._path_cost(prev, src, g))
-                     for g in goals if g in prev]
+        dist, prev_state = self._run(src, src_prev)
+
+        # 목표 노드 — 어떤 진입 방향(state) 으로든 도달 가능하면 최소 거리 선택
+        reachable = [(d, st) for st, d in dist.items() if st[0] in goals]
         if not reachable:
             return valid_actions[0] if valid_actions else src
 
-        goal = min(reachable, key=lambda x: x[1])[0]
-        path = self._reconstruct(prev, src, goal)
+        _, goal_state = min(reachable, key=lambda x: x[0])
+
+        # 경로 복원 — state chain → 노드 리스트
+        chain: list[tuple] = []
+        cur_st: Optional[tuple] = goal_state
+        while cur_st is not None:
+            chain.append(cur_st)
+            cur_st = prev_state.get(cur_st)
+        chain.reverse()                     # init … goal
+        path = [st[0] for st in chain]
 
         if len(path) < 2:
             return valid_actions[0] if valid_actions else src
         next_node = path[1]
         return next_node if next_node in valid_actions else (
             valid_actions[0] if valid_actions else src)
-
-    def _path_cost(self, prev, src, goal):
-        cost = 0.0
-        cur  = goal
-        while prev.get(cur) is not None:
-            p   = prev[cur]
-            lid = next((l for n, l in self.env.adj[p] if n == cur), None)
-            if lid:
-                cost += self.env.links[lid]["len"]
-            cur = p
-        return cost
-
-    def _reconstruct(self, prev, src, goal):
-        path, cur = [], goal
-        while cur is not None:
-            path.append(cur)
-            cur = prev.get(cur)
-        return list(reversed(path))
 
 
 class StaticFuelDijkstra(_DijkstraBase):
@@ -176,12 +209,17 @@ class StaticFuelDijkstra(_DijkstraBase):
                 continue
             u_node = self.env.nodes[u]
             u_left_ok = _node_allows_left(u_node)
-            for nb, lid in self.env.adj.get(u, []):
-                if nb == u_prev:        # U턴 방지
+            nbs_all = self.env.adj.get(u, [])
+            is_deadend = (len(nbs_all) <= 1)
+            for nb, lid in nbs_all:
+                # U턴 — degree-1 dead-end 에서만 허용 (env.get_valid_actions 와 정합).
+                if nb == u_prev and not is_deadend:
                     continue
                 # 좌회전 금지 노드의 좌회전 간선 제외 — env.get_valid_actions 와
                 # 정합. 미반영 시 계산 경로가 실제 통행 불가 간선을 포함해 탈선.
-                if not u_left_ok and u_prev is not None and u_prev != u:
+                # U턴(nb==u_prev) 은 좌회전 분류 대상 아니므로 제외.
+                if (not u_left_ok and u_prev is not None and u_prev != u
+                        and nb != u_prev):
                     if _movement_type(self.env.nodes[u_prev]["pos"],
                                       u_node["pos"],
                                       self.env.nodes[nb]["pos"]) == "left":

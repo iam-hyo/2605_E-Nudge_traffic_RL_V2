@@ -1,0 +1,7 @@
+[launch] model_rl_base  pid=3658795
+[launch] model_rl_signal  pid=3658796
+[launch] model_rl_signal_attention  pid=3658797
+[done]   model_rl_base  rc=0  t=23366s
+[done]   model_rl_signal  rc=0  t=23366s
+[done]   model_rl_signal_attention  rc=0  t=23366s
+[ALL DONE] 23366s

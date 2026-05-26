@@ -6,11 +6,15 @@ clean_gangnam.py
 원본 data/gangnam_topology.json 문제점:
   1. 링크 양 끝점 일부가 nodes 목록에 없음 (dangling) → RoadNetworkEnv 로드 시 KeyError
   2. link["len"] 값이 비현실적 (0.01~2.39) — 단위 불명, 다른 토폴로지(m)와 불일치
+  3. pos 가 [위도, 경도] 순 — RoadNetworkEnv·simulation 은 pos 를 [x,y] 로
+     해석하므로 위/경도 축이 뒤바뀌어, _movement_type 의 좌/우회전 외적 부호가
+     반전되고 지도가 전치(transpose)돼 렌더된다.
 정제:
   - 양 끝점이 모두 nodes 에 존재하는 링크만 유지
   - 길이를 노드 좌표(위경도)로부터 haversine 으로 재계산 (m 단위, 다른 토폴로지와 정합)
+  - pos 를 [경도(x), 위도(y)] 순으로 normalize — 좌표 규약을 격자 토폴로지와 통일
   - 신호/메타데이터는 그대로 유지
-출력: data/gangnam_clean_topology.json
+출력: data/gangnam_clean_topology.json (pos = [경도, 위도])
 
 사용: python util/clean_gangnam.py
 """
@@ -49,14 +53,20 @@ def main():
         if e1 not in nodes or e2 not in nodes:
             dropped += 1
             continue
+        # haversine 은 원본 [위도, 경도] 순서 그대로 입력 (swap 전에 계산).
         length = max(haversine(nodes[e1]["pos"], nodes[e2]["pos"]), 1.0)
         kept.append({**lk, "end1": e1, "end2": e2, "len": round(length, 1)})
 
+    # 좌표축 정규화 — 원본 pos=[위도,경도] → [경도(x),위도(y)] 로 swap.
+    out_nodes = [{**n, "pos": [n["pos"][1], n["pos"][0]]} for n in topo["nodes"]]
+
     clean = {
         "metadata": {**topo["metadata"],
+                     "coord_order": "[lon(x), lat(y)]",
                      "description": "gangnam (cleaned: dangling links removed, "
-                                    "lengths recomputed by haversine)"},
-        "nodes": topo["nodes"],
+                                    "lengths recomputed by haversine, "
+                                    "pos normalized to [lon, lat])"},
+        "nodes": out_nodes,
         "links": kept,
     }
     json.dump(clean, open(DST, "w", encoding="utf-8"),
