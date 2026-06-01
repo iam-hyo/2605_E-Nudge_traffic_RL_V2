@@ -150,6 +150,7 @@ def train_rl(mode: str, use_signal: bool, cfg_path: str = "config/config.yaml",
     checkpoint_every = tc.get("checkpoint_every", 500)
     warmup_steps     = tc.get("warmup_steps", 3000)
     shaping_w        = tc.get("shaping_weight", 0.0)
+    uturn_penalty    = float(cfg.get("reward", {}).get("uturn_penalty", 0.0))
 
     model_dir = Path(cfg["output"]["model_dir"])
     model_dir.mkdir(exist_ok=True)
@@ -176,6 +177,8 @@ def train_rl(mode: str, use_signal: bool, cfg_path: str = "config/config.yaml",
             f"max_steps={te['env'].max_steps}")
     log(f" ε: {tc['epsilon_start']} → {tc['epsilon_min']} "
         f"(decay={tc['epsilon_decay']}, ~{_ep_to_min(tc):.0f}ep)")
+    log(f" shaping_w={shaping_w}  uturn_penalty={uturn_penalty}  "
+        f"arrival_bonus={cfg.get('reward', {}).get('arrival_bonus', 500.0)}")
     log(f"{'='*60}")
 
     history     = []
@@ -220,6 +223,9 @@ def train_rl(mode: str, use_signal: bool, cfg_path: str = "config/config.yaml",
             if shaping_w > 0:
                 d_after  = _dist_to_goal(env)
                 reward  += shaping_w * (d_before - d_after) / map_diag
+
+            if uturn_penalty > 0 and info.get("movement") == "uturn":
+                reward -= uturn_penalty
 
             total_steps += 1
 

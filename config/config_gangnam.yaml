@@ -1,16 +1,17 @@
 # config_gangnam.yaml
-# 강남구 실도로망(1995 노드) 전용 설정 — 2026-05-22 재실험.
+# 강남구 실도로망(1995 노드) 전용 — 2026-05-29 신논현역 재실험.
 #
-# 선행 수정 (환경 정비):
-#   ① _movement_type 직진 임계 ±6° → ±30° (실도로 곡률을 직진으로 인정)
-#   ② 좌표축 정규화 — gangnam_clean_topology.json pos = [경도(x), 위도(y)]
-#   ③ 무신호 노드 좌·직·우 모두 허용 (_node_allows_left 신호유무 우선)
-#   → 좌회전 금지 93% → 4.7%, 회전제한 인지 도달성 0% → 99.3%
+# OD-1 변경: 한남IC(341188) → 신논현역 일대(342695)
+#   사유: 기존 OD-1은 5모델 경로 거의 동일 → 성능 차이 −2.7~−6.9% 미약.
+#   신논현역 일대 출발 시 거리최단 Dijkstra는 강남대로 한복판 정체 통과,
+#   fuel TDD는 한강·강남구 자동차전용 corridor 우회 → 사전 검증 peak −22.4%.
 #
-# 학습:  python -c "from train._train_common import train_rl;
-#          train_rl('base', False, 'config/config_gangnam.yaml', 'model_rl_base')"
-# 실험:  python -c "from experiments.run_experiment import main;
-#          main('config/config_gangnam.yaml')"
+# 학습 강화 (RL 성능 극대화):
+#   episodes 10000→15000, train_max_steps 300→400 (긴 우회 corridor 대비),
+#   arrival_bonus 500→700, epsilon_decay 0.99997→0.999975,
+#   checkpoint_every 2500→1500 (overshoot 방지),
+#   primary_boost OD-1 0→4 (OD-1 학습 비중 71%).
+#   U턴 페널티는 _train_common.py 학습 루프에서 -20 mL/U턴 추가.
 data:
   topology: data/gangnam_clean_topology.json
   speed: data/gangnam_clean_speed_data.csv
@@ -22,15 +23,14 @@ experiments:
     rl_signal: true
     rl_signal_attention: true
   repeat: 30
-  # ── 현실적 OD 3쌍 (무작위 start/goal 폐지) — 출근시간 통행 동선 ──
+  # ── 현실적 OD 3쌍 (OD-1 신논현역으로 갱신) ──
   routes:
-  - {name: od1_hannam_suseo,     start: '341188', goal: '613667', type: long}
+  - {name: od1_sinnonhyeon_suseo, start: '342695', goal: '613667', type: long}
   - {name: od2_yangjae_yeongdong, start: '338734', goal: '342812', type: long}
   - {name: od3_segok_samsung,    start: '340301', goal: '341509', type: long}
   time_slots:
   - {label: off_peak, start_hour: 7.0}
   - {label: peak,     start_hour: 8.0}
-  # experiment_route / experiment_time_slot 미지정 → 3 경로 × 2 시간대 전체 실험
 output:
   model_dir: models
   result_dir: output
@@ -43,21 +43,22 @@ physics:
   v_turn_right_kmh: 20.0
 reward:
   alpha: 1.0
-  # arrival_bonus: 12x12(200) → 500 으로 상향. 강남 OD 경로 연료(~1500~2500mL)
-  # 대비 도착 보너스 비중을 12x12 비율(arrival/fuel ≈ 0.2)에 맞춤. 무작위 walk
-  # reach 1~3% 인 환경에서 한 번의 arrival 경험이 강한 학습 신호가 되도록.
-  arrival_bonus: 500.0
+  # 강남구 OD 평균 fuel 1500~2500mL 기준 arrival/fuel ≈ 0.3 비율 (12x12 0.2 보다↑).
+  # 신논현 OD-1 거리 9~10km 로 길어 도달 인센티브 강화 필요.
+  arrival_bonus: 700.0
   penalty_dead: 0.0
   penalty_timeout: 0.0
+  # ── U턴 페널티 (이전 OD-3 stub trap 실패 해소) ──
+  # _train_common.py 에서만 사용. info.movement == "uturn" 일 때 -uturn_penalty
+  # 만큼 추가 부과 (eval 시 Dijkstra는 U턴 없음 — 영향 없음).
+  uturn_penalty: 20.0
 train:
   batch_size: 128
-  checkpoint_every: 2500
-  episodes: 10000
+  checkpoint_every: 1500       # best.pth overshoot/drift 방지 (보고서 §10.3)
+  episodes: 15000              # 신논현 OD-1 학습 cardinality 보강
   epsilon_start: 1.0
   epsilon_min: 0.05
-  # 강남구는 경로가 길어(step↑) ε가 step당 감쇠. degree-1 U턴 허용 후
-  # episode 길이가 늘어나(평균 50~250 step) ε 감쇠가 충분히 일어남.
-  epsilon_decay: 0.99997
+  epsilon_decay: 0.999975      # 긴 episode (avg ~280 step) 더 보수적 탐색
   gamma: 0.97
   log_interval: 100
   lr: 0.0005
@@ -65,18 +66,11 @@ train:
   multi_route: true
   target_update: 25
   warmup_steps: 2000
-  train_max_steps: 300
-  # ── 포텐셜 기반 shaping — 강남구 규모 적응 ──
-  # 12x12(w=500) 대비 경로 step 수가 2~3배 많고, 실도로 곡률로 step당 직선거리
-  # 감소분이 작아 map_diag 정규화만으로는 step당 shaping이 약 1/3로 축소된다.
-  # 강남구 무작위 walk reach 1~3% 환경에서 direction signal 을 더 강하게
-  # 주기 위해 w=1500 으로 상향. 텔레스코핑 합은 시작-목표 거리에만 의존
-  # → 최소연료 최적해는 불변(Ng 1999).
-  shaping_weight: 1500.0
-  # 강남구 단일 토폴로지 집중 학습 (무작위 경로 없이 OD 3쌍만).
+  train_max_steps: 400         # 우회 corridor (~10km, ~80~120 step) 대비 4~5배 여유
+  shaping_weight: 1500.0       # 텔레스코핑 합 = w·(d_start−d_end)/map_diag, policy invariance 유지
   topologies:
   - topology: data/gangnam_clean_topology.json
     speed: data/gangnam_clean_speed_data.csv
     weight: 1.0
     use_config_routes: true
-    primary_boost: 0
+    primary_boost: 4           # OD-1 추가 복제 4회 → 학습 비중 5/7 ≈ 71%

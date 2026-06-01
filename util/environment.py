@@ -184,7 +184,9 @@ class RoadNetworkEnv:
         """
         self.use_signal = use_signal
         self.deterministic_speed = deterministic_speed
-        self.reward_calc = RewardCalculator(**(reward_cfg or {}))
+        _RC_KEYS = {"alpha", "arrival_bonus", "penalty_timeout", "penalty_dead"}
+        rc_kw = {k: v for k, v in (reward_cfg or {}).items() if k in _RC_KEYS}
+        self.reward_calc = RewardCalculator(**rc_kw)
 
         # ── 토폴로지 로드 ─────────────────────────────────────────────────────
         with open(topology_path, encoding="utf-8") as f:

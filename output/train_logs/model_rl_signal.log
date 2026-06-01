@@ -1,322 +1,477 @@
-/home/hjj/2605_E-Nudge_traffic_RL_V2/venv/lib/python3.13/site-packages/torch/cuda/__init__.py:187: UserWarning: CUDA initialization: The NVIDIA driver on your system is too old (found version 12020). Please update your GPU driver by downloading and installing a new version from the URL: http://www.nvidia.com/Download/index.aspx Alternatively, go to: https://pytorch.org to install a PyTorch version that has been compiled with your version of the CUDA driver. (Triggered internally at /pytorch/c10/cuda/CUDAFunctions.cpp:119.)
-  return torch._C._cuda_getDeviceCount() > 0
 
 ============================================================
  학습 시작 | mode=signal | use_signal=True
- episodes=10000 | batch=128
+ episodes=15000 | batch=128
  memory=80000 | warmup=2000 steps
  학습 토폴로지 (1개):
-   - gangnam_clean_topology   w=1.00 nodes=1995 routes=3 max_steps=300
- ε: 1.0 → 0.05 (decay=0.99997, ~99856ep)
+   - gangnam_clean_topology   w=1.00 nodes=1995 routes=7 max_steps=400
+ ε: 1.0 → 0.05 (decay=0.999975, ~119828ep)
+ shaping_w=1500.0  uturn_penalty=20.0  arrival_bonus=700.0
 ============================================================
-Ep  100/10000 | R=-4053.7 | Fuel=4375.6mL | Wait=1710s | Steps=266.4 | Reach=7% | ε=0.477 | Loss=41.925 | t=309s
-          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=14%
-          └ 이동 분포: straight=46%  left=25%  right=28%
-Ep  200/10000 | R=-3109.4 | Fuel=3645.9mL | Wait=1137s | Steps=276.9 | Reach=21% | ε=0.208 | Loss=43.260 | t=772s
-          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=26%
-          └ 이동 분포: straight=41%  left=28%  right=31%
-Ep  300/10000 | R=-2453.4 | Fuel=2922.1mL | Wait= 933s | Steps=274.6 | Reach=21% | ε=0.091 | Loss=39.468 | t=1181s
-          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=20%
-          └ 이동 분포: straight=42%  left=29%  right=29%
-Ep  400/10000 | R=-2064.9 | Fuel=2466.1mL | Wait= 589s | Steps=285.5 | Reach=13% | ε=0.050 | Loss=33.182 | t=1544s
+Ep  100/15000 | R=-6040.1 | Fuel=5855.1mL | Wait=2425s | Steps=381.1 | Reach=9% | ε=0.405 | Loss=37.481 | t=451s
           ├ 토폴로지 도달률(최근50): gangnam_clean_topology=12%
-          └ 이동 분포: straight=35%  left=37%  right=28%
-Ep  500/10000 | R=-1313.9 | Fuel=1897.2mL | Wait= 230s | Steps=233.8 | Reach=33% | ε=0.050 | Loss=25.544 | t=1842s
-          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=44%
-          └ 이동 분포: straight=26%  left=40%  right=34%
-Ep  600/10000 | R=-1053.5 | Fuel=1699.4mL | Wait= 201s | Steps=206.1 | Reach=39% | ε=0.050 | Loss=28.598 | t=2105s
-          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=40%
-          └ 이동 분포: straight=25%  left=51%  right=24%
-Ep  700/10000 | R=-1062.9 | Fuel=1662.9mL | Wait= 159s | Steps=210.9 | Reach=40% | ε=0.050 | Loss=21.191 | t=2384s
-          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=44%
-          └ 이동 분포: straight=23%  left=56%  right=20%
-Ep  800/10000 | R=-1003.3 | Fuel=1618.1mL | Wait= 177s | Steps=209.9 | Reach=40% | ε=0.050 | Loss=25.745 | t=2654s
-          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=44%
-          └ 이동 분포: straight=21%  left=60%  right=19%
-Ep  900/10000 | R= -811.4 | Fuel=1472.1mL | Wait= 111s | Steps=197.5 | Reach=43% | ε=0.050 | Loss=18.885 | t=2918s
+          └ 이동 분포: straight=48%  left=25%  right=27%
+Ep  200/15000 | R=-3581.8 | Fuel=3893.6mL | Wait=1227s | Steps=331.4 | Reach=36% | ε=0.177 | Loss=62.098 | t=837s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=30%
+          └ 이동 분포: straight=42%  left=30%  right=28%
+Ep  300/15000 | R=-2635.8 | Fuel=2992.2mL | Wait= 648s | Steps=340.7 | Reach=31% | ε=0.076 | Loss=48.736 | t=1282s
           ├ 토폴로지 도달률(최근50): gangnam_clean_topology=28%
-          └ 이동 분포: straight=19%  left=63%  right=18%
-Ep 1000/10000 | R=-1048.8 | Fuel=1613.0mL | Wait= 192s | Steps=219.2 | Reach=37% | ε=0.050 | Loss=17.447 | t=3218s
+          └ 이동 분포: straight=30%  left=44%  right=26%
+Ep  400/15000 | R=-2435.8 | Fuel=2741.1mL | Wait= 447s | Steps=374.8 | Reach=12% | ε=0.050 | Loss=16.294 | t=1766s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=2%
+          └ 이동 분포: straight=20%  left=59%  right=20%
+Ep  500/15000 | R=-1933.5 | Fuel=2377.3mL | Wait= 383s | Steps=357.3 | Reach=19% | ε=0.050 | Loss=14.734 | t=2230s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=28%
+          └ 이동 분포: straight=20%  left=53%  right=27%
+Ep  600/15000 | R=-1762.7 | Fuel=2505.9mL | Wait= 352s | Steps=318.9 | Reach=41% | ε=0.050 | Loss=25.709 | t=2644s
           ├ 토폴로지 도달률(최근50): gangnam_clean_topology=40%
-          └ 이동 분포: straight=20%  left=61%  right=18%
-Ep 1100/10000 | R= -863.1 | Fuel=1480.1mL | Wait= 130s | Steps=204.3 | Reach=40% | ε=0.050 | Loss=15.102 | t=3495s
-          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=38%
-          └ 이동 분포: straight=18%  left=66%  right=16%
-Ep 1200/10000 | R= -853.0 | Fuel=1503.4mL | Wait= 113s | Steps=196.1 | Reach=41% | ε=0.050 | Loss=14.536 | t=3768s
-          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=34%
-          └ 이동 분포: straight=20%  left=63%  right=17%
-Ep 1300/10000 | R= -729.6 | Fuel=1538.6mL | Wait= 204s | Steps=176.1 | Reach=62% | ε=0.050 | Loss=17.377 | t=4014s
-          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=56%
-          └ 이동 분포: straight=25%  left=59%  right=15%
-Ep 1400/10000 | R= -686.4 | Fuel=1440.2mL | Wait= 153s | Steps=176.9 | Reach=53% | ε=0.050 | Loss=15.303 | t=4280s
-          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=58%
-          └ 이동 분포: straight=21%  left=66%  right=13%
-Ep 1500/10000 | R= -427.0 | Fuel=1366.8mL | Wait= 153s | Steps=143.4 | Reach=69% | ε=0.050 | Loss=16.318 | t=4483s
-          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=70%
-          └ 이동 분포: straight=24%  left=64%  right=12%
-Ep 1600/10000 | R= -697.2 | Fuel=1435.4mL | Wait= 205s | Steps=179.5 | Reach=57% | ε=0.050 | Loss=14.242 | t=4749s
-          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=66%
-          └ 이동 분포: straight=22%  left=67%  right=11%
-Ep 1700/10000 | R= -417.4 | Fuel=1278.1mL | Wait= 149s | Steps=148.8 | Reach=64% | ε=0.050 | Loss=11.676 | t=4970s
-          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=60%
-          └ 이동 분포: straight=23%  left=68%  right=9%
-Ep 1800/10000 | R= -499.5 | Fuel=1375.4mL | Wait= 182s | Steps=142.8 | Reach=67% | ε=0.050 | Loss=13.532 | t=5187s
-          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=72%
-          └ 이동 분포: straight=25%  left=64%  right=10%
-Ep 1900/10000 | R= -378.4 | Fuel=1274.9mL | Wait= 217s | Steps=129.9 | Reach=70% | ε=0.050 | Loss=11.595 | t=5375s
-          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=74%
-          └ 이동 분포: straight=28%  left=62%  right=10%
-Ep 2000/10000 | R= -453.2 | Fuel=1216.7mL | Wait= 212s | Steps=145.7 | Reach=64% | ε=0.050 | Loss=9.862 | t=5587s
-          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=58%
-          └ 이동 분포: straight=23%  left=70%  right=7%
-Ep 2100/10000 | R= -359.2 | Fuel=1205.3mL | Wait= 182s | Steps=133.5 | Reach=66% | ε=0.050 | Loss=9.414 | t=5793s
-          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=58%
-          └ 이동 분포: straight=24%  left=68%  right=8%
-Ep 2200/10000 | R= -444.1 | Fuel=1200.0mL | Wait= 176s | Steps=150.0 | Reach=61% | ε=0.050 | Loss=7.820 | t=6050s
-          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=48%
-          └ 이동 분포: straight=22%  left=71%  right=7%
-Ep 2300/10000 | R= -357.4 | Fuel=1234.4mL | Wait= 147s | Steps=136.3 | Reach=67% | ε=0.050 | Loss=8.029 | t=6254s
-          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=68%
-          └ 이동 분포: straight=24%  left=68%  right=8%
-Ep 2400/10000 | R= -449.2 | Fuel=1205.2mL | Wait= 180s | Steps=152.3 | Reach=61% | ε=0.050 | Loss=7.532 | t=6483s
-          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=62%
-          └ 이동 분포: straight=21%  left=72%  right=7%
-Ep 2500/10000 | R= -282.1 | Fuel=1200.5mL | Wait= 162s | Steps=123.5 | Reach=70% | ε=0.050 | Loss=7.363 | t=6673s
-          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=74%
-          └ 이동 분포: straight=25%  left=68%  right=7%
-  [체크포인트] model_rl_signal_ep2500.pth
-Ep 2600/10000 | R= -288.8 | Fuel=1167.6mL | Wait= 213s | Steps=124.1 | Reach=71% | ε=0.050 | Loss=6.884 | t=6872s
-          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=68%
-          └ 이동 분포: straight=26%  left=67%  right=7%
-Ep 2700/10000 | R= -310.9 | Fuel=1190.9mL | Wait= 196s | Steps=126.0 | Reach=70% | ε=0.050 | Loss=6.815 | t=7065s
-          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=72%
-          └ 이동 분포: straight=26%  left=67%  right=7%
-Ep 2800/10000 | R= -382.3 | Fuel=1184.5mL | Wait= 198s | Steps=138.6 | Reach=65% | ε=0.050 | Loss=7.392 | t=7277s
-          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=64%
-          └ 이동 분포: straight=24%  left=69%  right=6%
-Ep 2900/10000 | R= -381.8 | Fuel=1251.7mL | Wait= 204s | Steps=130.0 | Reach=68% | ε=0.050 | Loss=6.984 | t=7473s
-          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=66%
-          └ 이동 분포: straight=26%  left=66%  right=7%
-Ep 3000/10000 | R= -375.1 | Fuel=1193.7mL | Wait= 191s | Steps=137.7 | Reach=65% | ε=0.050 | Loss=6.783 | t=7685s
-          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=72%
-          └ 이동 분포: straight=24%  left=70%  right=6%
-Ep 3100/10000 | R= -382.2 | Fuel=1181.5mL | Wait= 237s | Steps=136.2 | Reach=67% | ε=0.050 | Loss=6.744 | t=7887s
-          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=68%
-          └ 이동 분포: straight=26%  left=67%  right=7%
-Ep 3200/10000 | R= -469.8 | Fuel=1261.0mL | Wait= 166s | Steps=147.8 | Reach=61% | ε=0.050 | Loss=7.472 | t=8106s
-          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=56%
-          └ 이동 분포: straight=22%  left=71%  right=7%
-Ep 3300/10000 | R= -396.1 | Fuel=1155.3mL | Wait= 192s | Steps=145.1 | Reach=63% | ε=0.050 | Loss=6.665 | t=8324s
-          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=64%
-          └ 이동 분포: straight=23%  left=71%  right=6%
-Ep 3400/10000 | R= -357.6 | Fuel=1178.8mL | Wait= 144s | Steps=142.4 | Reach=62% | ε=0.050 | Loss=6.608 | t=8540s
-          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=62%
-          └ 이동 분포: straight=21%  left=73%  right=6%
-Ep 3500/10000 | R= -560.1 | Fuel=1211.3mL | Wait= 190s | Steps=168.9 | Reach=54% | ε=0.050 | Loss=10.365 | t=8798s
-          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=56%
-          └ 이동 분포: straight=20%  left=74%  right=6%
-Ep 3600/10000 | R= -505.9 | Fuel=1276.2mL | Wait= 234s | Steps=146.2 | Reach=63% | ε=0.050 | Loss=6.956 | t=9023s
-          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=64%
-          └ 이동 분포: straight=25%  left=67%  right=8%
-Ep 3700/10000 | R= -399.0 | Fuel=1165.9mL | Wait= 176s | Steps=146.9 | Reach=61% | ε=0.050 | Loss=6.250 | t=9241s
-          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=64%
-          └ 이동 분포: straight=22%  left=72%  right=6%
-Ep 3800/10000 | R= -389.8 | Fuel=1161.1mL | Wait= 169s | Steps=146.0 | Reach=62% | ε=0.050 | Loss=5.587 | t=9453s
-          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=60%
-          └ 이동 분포: straight=22%  left=72%  right=6%
-Ep 3900/10000 | R= -237.5 | Fuel=1148.3mL | Wait= 186s | Steps=118.8 | Reach=72% | ε=0.050 | Loss=5.476 | t=9621s
-          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=68%
-          └ 이동 분포: straight=27%  left=66%  right=7%
-Ep 4000/10000 | R= -341.3 | Fuel=1202.3mL | Wait= 180s | Steps=131.5 | Reach=67% | ε=0.050 | Loss=5.892 | t=9810s
-          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=78%
-          └ 이동 분포: straight=25%  left=68%  right=7%
-Ep 4100/10000 | R= -266.6 | Fuel=1202.7mL | Wait= 225s | Steps=115.7 | Reach=74% | ε=0.050 | Loss=5.655 | t=9983s
-          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=66%
-          └ 이동 분포: straight=29%  left=64%  right=8%
-Ep 4200/10000 | R= -367.7 | Fuel=1180.2mL | Wait= 184s | Steps=137.2 | Reach=65% | ε=0.050 | Loss=5.157 | t=10196s
-          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=60%
-          └ 이동 분포: straight=24%  left=69%  right=7%
-Ep 4300/10000 | R= -380.3 | Fuel=1226.0mL | Wait= 214s | Steps=134.5 | Reach=67% | ε=0.050 | Loss=5.862 | t=10408s
-          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=66%
-          └ 이동 분포: straight=25%  left=67%  right=8%
-Ep 4400/10000 | R= -345.6 | Fuel=1218.4mL | Wait= 190s | Steps=130.7 | Reach=68% | ε=0.050 | Loss=6.366 | t=10611s
-          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=62%
-          └ 이동 분포: straight=25%  left=68%  right=7%
-Ep 4500/10000 | R= -380.6 | Fuel=1169.8mL | Wait= 158s | Steps=146.9 | Reach=61% | ε=0.050 | Loss=6.379 | t=10831s
+          └ 이동 분포: straight=25%  left=61%  right=14%
+Ep  700/15000 | R=-1650.9 | Fuel=2383.4mL | Wait= 340s | Steps=301.1 | Reach=46% | ε=0.050 | Loss=38.400 | t=3054s
           ├ 토폴로지 도달률(최근50): gangnam_clean_topology=52%
-          └ 이동 분포: straight=22%  left=72%  right=6%
-Ep 4600/10000 | R= -366.1 | Fuel=1165.2mL | Wait= 150s | Steps=143.8 | Reach=62% | ε=0.050 | Loss=6.012 | t=11051s
-          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=62%
-          └ 이동 분포: straight=22%  left=72%  right=6%
-Ep 4700/10000 | R= -343.2 | Fuel=1224.0mL | Wait= 187s | Steps=129.5 | Reach=69% | ε=0.050 | Loss=7.760 | t=11254s
-          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=74%
-          └ 이동 분포: straight=26%  left=67%  right=7%
-Ep 4800/10000 | R= -382.0 | Fuel=1154.5mL | Wait= 164s | Steps=146.4 | Reach=61% | ε=0.050 | Loss=6.452 | t=11485s
-          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=62%
-          └ 이동 분포: straight=21%  left=72%  right=7%
-Ep 4900/10000 | R= -276.0 | Fuel=1170.8mL | Wait= 134s | Steps=129.0 | Reach=66% | ε=0.050 | Loss=5.738 | t=11681s
-          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=68%
-          └ 이동 분포: straight=23%  left=72%  right=6%
-Ep 5000/10000 | R= -385.1 | Fuel=1216.5mL | Wait= 157s | Steps=139.2 | Reach=63% | ε=0.050 | Loss=6.243 | t=11895s
-          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=66%
-          └ 이동 분포: straight=23%  left=71%  right=6%
-  [체크포인트] model_rl_signal_ep5000.pth
-Ep 5100/10000 | R= -406.3 | Fuel=1154.2mL | Wait= 146s | Steps=153.8 | Reach=58% | ε=0.050 | Loss=5.571 | t=12136s
-          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=60%
-          └ 이동 분포: straight=20%  left=74%  right=6%
-Ep 5200/10000 | R= -300.8 | Fuel=1192.4mL | Wait= 168s | Steps=128.7 | Reach=69% | ε=0.050 | Loss=7.935 | t=12338s
-          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=70%
-          └ 이동 분포: straight=26%  left=67%  right=7%
-Ep 5300/10000 | R= -347.1 | Fuel=1199.4mL | Wait= 207s | Steps=130.6 | Reach=68% | ε=0.050 | Loss=6.571 | t=12542s
-          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=76%
-          └ 이동 분포: straight=25%  left=68%  right=7%
-Ep 5400/10000 | R= -440.8 | Fuel=1187.9mL | Wait= 158s | Steps=154.3 | Reach=59% | ε=0.050 | Loss=5.982 | t=12786s
-          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=60%
-          └ 이동 분포: straight=21%  left=73%  right=6%
-Ep 5500/10000 | R= -314.3 | Fuel=1181.2mL | Wait= 158s | Steps=132.8 | Reach=66% | ε=0.050 | Loss=6.677 | t=12990s
-          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=64%
-          └ 이동 분포: straight=24%  left=70%  right=6%
-Ep 5600/10000 | R= -400.9 | Fuel=1176.8mL | Wait= 188s | Steps=144.0 | Reach=63% | ε=0.050 | Loss=5.714 | t=13205s
-          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=60%
-          └ 이동 분포: straight=23%  left=71%  right=6%
-Ep 5700/10000 | R= -277.5 | Fuel=1222.9mL | Wait= 179s | Steps=119.1 | Reach=71% | ε=0.050 | Loss=6.262 | t=13390s
-          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=76%
-          └ 이동 분포: straight=27%  left=66%  right=7%
-Ep 5800/10000 | R= -337.6 | Fuel=1165.9mL | Wait= 183s | Steps=134.5 | Reach=66% | ε=0.050 | Loss=5.598 | t=13598s
-          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=56%
-          └ 이동 분포: straight=25%  left=68%  right=7%
-Ep 5900/10000 | R= -245.4 | Fuel=1189.5mL | Wait= 173s | Steps=118.9 | Reach=72% | ε=0.050 | Loss=6.066 | t=13788s
-          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=76%
-          └ 이동 분포: straight=27%  left=66%  right=7%
-Ep 6000/10000 | R= -448.1 | Fuel=1237.1mL | Wait= 213s | Steps=146.7 | Reach=64% | ε=0.050 | Loss=6.429 | t=14016s
-          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=60%
-          └ 이동 분포: straight=25%  left=68%  right=7%
-Ep 6100/10000 | R= -468.8 | Fuel=1198.9mL | Wait= 199s | Steps=156.6 | Reach=59% | ε=0.050 | Loss=5.779 | t=14261s
-          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=60%
-          └ 이동 분포: straight=21%  left=73%  right=6%
-Ep 6200/10000 | R= -255.1 | Fuel=1196.2mL | Wait= 209s | Steps=114.5 | Reach=75% | ε=0.050 | Loss=6.235 | t=14446s
-          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=78%
-          └ 이동 분포: straight=30%  left=63%  right=7%
-Ep 6300/10000 | R= -344.4 | Fuel=1145.7mL | Wait= 189s | Steps=138.7 | Reach=65% | ε=0.050 | Loss=5.443 | t=14664s
-          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=62%
-          └ 이동 분포: straight=24%  left=71%  right=6%
-Ep 6400/10000 | R= -382.8 | Fuel=1173.1mL | Wait= 200s | Steps=140.3 | Reach=65% | ε=0.050 | Loss=5.599 | t=14880s
-          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=62%
-          └ 이동 분포: straight=24%  left=70%  right=6%
-Ep 6500/10000 | R= -369.9 | Fuel=1189.2mL | Wait= 169s | Steps=139.6 | Reach=64% | ε=0.050 | Loss=5.702 | t=15099s
-          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=76%
-          └ 이동 분포: straight=24%  left=70%  right=6%
-Ep 6600/10000 | R= -286.2 | Fuel=1175.8mL | Wait= 209s | Steps=124.5 | Reach=71% | ε=0.050 | Loss=5.801 | t=15296s
-          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=74%
-          └ 이동 분포: straight=27%  left=66%  right=7%
-Ep 6700/10000 | R= -371.2 | Fuel=1161.6mL | Wait= 195s | Steps=140.1 | Reach=65% | ε=0.050 | Loss=5.344 | t=15520s
-          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=64%
-          └ 이동 분포: straight=24%  left=70%  right=6%
-Ep 6800/10000 | R= -335.4 | Fuel=1180.0mL | Wait= 171s | Steps=134.9 | Reach=66% | ε=0.050 | Loss=5.612 | t=15725s
-          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=74%
-          └ 이동 분포: straight=24%  left=69%  right=7%
-Ep 6900/10000 | R= -217.0 | Fuel=1181.0mL | Wait= 163s | Steps=114.1 | Reach=74% | ε=0.050 | Loss=5.882 | t=15902s
-          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=78%
-          └ 이동 분포: straight=28%  left=66%  right=7%
-Ep 7000/10000 | R= -260.0 | Fuel=1198.0mL | Wait= 173s | Steps=119.5 | Reach=72% | ε=0.050 | Loss=6.046 | t=16094s
-          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=68%
-          └ 이동 분포: straight=26%  left=66%  right=7%
-Ep 7100/10000 | R= -327.7 | Fuel=1218.2mL | Wait= 200s | Steps=127.5 | Reach=70% | ε=0.050 | Loss=6.124 | t=16301s
+          └ 이동 분포: straight=26%  left=54%  right=19%
+Ep  800/15000 | R= -929.8 | Fuel=2130.1mL | Wait= 324s | Steps=175.5 | Reach=84% | ε=0.050 | Loss=46.422 | t=3299s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=92%
+          └ 이동 분포: straight=38%  left=45%  right=17%
+Ep  900/15000 | R= -772.6 | Fuel=1955.6mL | Wait= 305s | Steps=162.6 | Reach=83% | ε=0.050 | Loss=54.115 | t=3515s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=88%
+          └ 이동 분포: straight=42%  left=31%  right=27%
+Ep 1000/15000 | R=-1010.4 | Fuel=2018.9mL | Wait= 275s | Steps=222.8 | Reach=68% | ε=0.050 | Loss=26.324 | t=3818s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=44%
+          └ 이동 분포: straight=31%  left=42%  right=26%
+Ep 1100/15000 | R= -597.5 | Fuel=1797.8mL | Wait= 293s | Steps=193.2 | Reach=79% | ε=0.050 | Loss=24.682 | t=4082s
           ├ 토폴로지 도달률(최근50): gangnam_clean_topology=72%
-          └ 이동 분포: straight=26%  left=68%  right=6%
-Ep 7200/10000 | R= -377.7 | Fuel=1193.6mL | Wait= 207s | Steps=139.6 | Reach=67% | ε=0.050 | Loss=5.434 | t=16508s
-          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=62%
-          └ 이동 분포: straight=25%  left=68%  right=7%
-Ep 7300/10000 | R= -285.5 | Fuel=1179.6mL | Wait= 204s | Steps=123.8 | Reach=72% | ε=0.050 | Loss=5.372 | t=16692s
-          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=66%
-          └ 이동 분포: straight=26%  left=66%  right=7%
-Ep 7400/10000 | R= -410.5 | Fuel=1171.8mL | Wait= 178s | Steps=147.7 | Reach=61% | ε=0.050 | Loss=5.279 | t=16930s
-          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=60%
-          └ 이동 분포: straight=22%  left=72%  right=6%
-Ep 7500/10000 | R= -234.0 | Fuel=1157.7mL | Wait= 153s | Steps=121.3 | Reach=70% | ε=0.050 | Loss=5.264 | t=17129s
-          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=70%
-          └ 이동 분포: straight=24%  left=70%  right=6%
-  [체크포인트] model_rl_signal_ep7500.pth
-Ep 7600/10000 | R= -518.2 | Fuel=1186.0mL | Wait= 185s | Steps=165.8 | Reach=55% | ε=0.050 | Loss=4.874 | t=17389s
-          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=56%
-          └ 이동 분포: straight=19%  left=75%  right=6%
-Ep 7700/10000 | R= -327.4 | Fuel=1208.8mL | Wait= 173s | Steps=129.1 | Reach=68% | ε=0.050 | Loss=4.982 | t=17591s
-          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=72%
-          └ 이동 분포: straight=26%  left=68%  right=6%
-Ep 7800/10000 | R= -245.0 | Fuel=1186.9mL | Wait= 198s | Steps=114.1 | Reach=74% | ε=0.050 | Loss=6.693 | t=17765s
-          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=74%
-          └ 이동 분포: straight=28%  left=65%  right=7%
-Ep 7900/10000 | R= -403.0 | Fuel=1244.3mL | Wait= 235s | Steps=137.5 | Reach=66% | ε=0.050 | Loss=6.857 | t=17981s
-          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=66%
-          └ 이동 분포: straight=25%  left=68%  right=7%
-Ep 8000/10000 | R= -373.0 | Fuel=1190.3mL | Wait= 199s | Steps=137.3 | Reach=66% | ε=0.050 | Loss=5.632 | t=18197s
-          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=64%
-          └ 이동 분포: straight=24%  left=70%  right=6%
-Ep 8100/10000 | R= -234.7 | Fuel=1193.0mL | Wait= 191s | Steps=114.2 | Reach=74% | ε=0.050 | Loss=5.372 | t=18373s
-          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=76%
-          └ 이동 분포: straight=29%  left=64%  right=7%
-Ep 8200/10000 | R= -376.9 | Fuel=1189.6mL | Wait= 185s | Steps=138.3 | Reach=65% | ε=0.050 | Loss=5.256 | t=18585s
-          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=66%
-          └ 이동 분포: straight=24%  left=69%  right=7%
-Ep 8300/10000 | R= -263.5 | Fuel=1227.4mL | Wait= 197s | Steps=118.0 | Reach=74% | ε=0.050 | Loss=5.710 | t=18770s
-          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=62%
-          └ 이동 분포: straight=29%  left=63%  right=8%
-Ep 8400/10000 | R= -376.0 | Fuel=1196.4mL | Wait= 154s | Steps=142.3 | Reach=63% | ε=0.050 | Loss=5.738 | t=18995s
-          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=62%
-          └ 이동 분포: straight=22%  left=72%  right=6%
-Ep 8500/10000 | R= -444.9 | Fuel=1259.9mL | Wait= 168s | Steps=148.6 | Reach=61% | ε=0.050 | Loss=5.472 | t=19233s
-          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=58%
-          └ 이동 분포: straight=22%  left=71%  right=7%
-Ep 8600/10000 | R= -203.1 | Fuel=1186.1mL | Wait= 192s | Steps=108.6 | Reach=77% | ε=0.050 | Loss=5.551 | t=19408s
+          └ 이동 분포: straight=32%  left=40%  right=28%
+Ep 1200/15000 | R= -244.4 | Fuel=1586.7mL | Wait= 281s | Steps=120.6 | Reach=91% | ε=0.050 | Loss=23.782 | t=4252s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=92%
+          └ 이동 분포: straight=51%  left=30%  right=20%
+Ep 1300/15000 | R= -439.8 | Fuel=1601.8mL | Wait= 279s | Steps=147.0 | Reach=81% | ε=0.050 | Loss=22.606 | t=4456s
           ├ 토폴로지 도달률(최근50): gangnam_clean_topology=80%
-          └ 이동 분포: straight=31%  left=62%  right=7%
-Ep 8700/10000 | R= -361.7 | Fuel=1190.9mL | Wait= 166s | Steps=139.0 | Reach=65% | ε=0.050 | Loss=5.510 | t=19632s
-          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=62%
-          └ 이동 분포: straight=24%  left=70%  right=6%
-Ep 8800/10000 | R= -306.9 | Fuel=1219.3mL | Wait= 176s | Steps=127.4 | Reach=70% | ε=0.050 | Loss=5.661 | t=19835s
-          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=72%
-          └ 이동 분포: straight=25%  left=68%  right=7%
-Ep 8900/10000 | R= -256.9 | Fuel=1189.7mL | Wait= 182s | Steps=119.2 | Reach=72% | ε=0.050 | Loss=5.561 | t=20029s
-          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=72%
-          └ 이동 분포: straight=27%  left=67%  right=7%
-Ep 9000/10000 | R= -348.6 | Fuel=1198.7mL | Wait= 167s | Steps=136.0 | Reach=66% | ε=0.050 | Loss=5.183 | t=20250s
-          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=64%
-          └ 이동 분포: straight=24%  left=70%  right=6%
-Ep 9100/10000 | R= -385.7 | Fuel=1166.0mL | Wait= 198s | Steps=142.7 | Reach=64% | ε=0.050 | Loss=4.990 | t=20483s
-          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=58%
-          └ 이동 분포: straight=23%  left=70%  right=6%
-Ep 9200/10000 | R= -297.8 | Fuel=1180.9mL | Wait= 220s | Steps=124.4 | Reach=72% | ε=0.050 | Loss=4.891 | t=20686s
-          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=70%
-          └ 이동 분포: straight=28%  left=65%  right=7%
-Ep 9300/10000 | R= -315.9 | Fuel=1223.6mL | Wait= 212s | Steps=122.4 | Reach=72% | ε=0.050 | Loss=7.994 | t=20891s
-          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=72%
-          └ 이동 분포: straight=27%  left=65%  right=8%
-Ep 9400/10000 | R= -337.9 | Fuel=1164.1mL | Wait= 204s | Steps=132.6 | Reach=68% | ε=0.050 | Loss=5.258 | t=21115s
-          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=66%
-          └ 이동 분포: straight=26%  left=68%  right=6%
-Ep 9500/10000 | R= -424.6 | Fuel=1219.0mL | Wait= 168s | Steps=146.3 | Reach=61% | ε=0.050 | Loss=5.308 | t=21357s
-          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=54%
-          └ 이동 분포: straight=21%  left=73%  right=6%
-Ep 9600/10000 | R= -335.4 | Fuel=1181.5mL | Wait= 196s | Steps=133.9 | Reach=67% | ε=0.050 | Loss=5.418 | t=21585s
-          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=66%
-          └ 이동 분포: straight=24%  left=69%  right=7%
-Ep 9700/10000 | R= -479.6 | Fuel=1201.0mL | Wait= 256s | Steps=153.8 | Reach=62% | ε=0.050 | Loss=5.880 | t=21836s
-          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=70%
-          └ 이동 분포: straight=23%  left=70%  right=7%
-Ep 9800/10000 | R= -335.7 | Fuel=1170.2mL | Wait= 163s | Steps=137.4 | Reach=65% | ε=0.050 | Loss=5.784 | t=22065s
-          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=68%
-          └ 이동 분포: straight=23%  left=70%  right=6%
-Ep 9900/10000 | R= -376.3 | Fuel=1180.2mL | Wait= 158s | Steps=142.7 | Reach=63% | ε=0.050 | Loss=5.585 | t=22297s
-          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=60%
-          └ 이동 분포: straight=23%  left=72%  right=6%
-Ep 10000/10000 | R= -375.5 | Fuel=1221.3mL | Wait= 177s | Steps=138.9 | Reach=65% | ε=0.050 | Loss=6.773 | t=22514s
-          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=66%
-          └ 이동 분포: straight=24%  left=70%  right=7%
-  [체크포인트] model_rl_signal_ep10000.pth
+          └ 이동 분포: straight=40%  left=47%  right=13%
+Ep 1400/15000 | R= -383.0 | Fuel=1566.1mL | Wait= 259s | Steps=147.4 | Reach=82% | ε=0.050 | Loss=16.999 | t=4668s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=84%
+          └ 이동 분포: straight=38%  left=50%  right=12%
+Ep 1500/15000 | R= -505.2 | Fuel=1740.1mL | Wait= 283s | Steps=149.8 | Reach=84% | ε=0.050 | Loss=19.310 | t=4883s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=90%
+          └ 이동 분포: straight=44%  left=45%  right=11%
+  [체크포인트] model_rl_signal_ep1500.pth
+Ep 1600/15000 | R= -545.0 | Fuel=1763.4mL | Wait= 299s | Steps=151.9 | Reach=83% | ε=0.050 | Loss=17.299 | t=5100s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=88%
+          └ 이동 분포: straight=45%  left=44%  right=11%
+Ep 1700/15000 | R= -474.6 | Fuel=1704.8mL | Wait= 273s | Steps=145.0 | Reach=83% | ε=0.050 | Loss=16.476 | t=5312s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=86%
+          └ 이동 분포: straight=47%  left=43%  right=10%
+Ep 1800/15000 | R= -423.0 | Fuel=1565.3mL | Wait= 265s | Steps=154.9 | Reach=80% | ε=0.050 | Loss=15.072 | t=5537s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=82%
+          └ 이동 분포: straight=38%  left=52%  right=10%
+Ep 1900/15000 | R= -286.2 | Fuel=1544.8mL | Wait= 308s | Steps=126.3 | Reach=87% | ε=0.050 | Loss=17.005 | t=5709s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=88%
+          └ 이동 분포: straight=45%  left=43%  right=11%
+Ep 2000/15000 | R= -240.9 | Fuel=1472.5mL | Wait= 289s | Steps=130.9 | Reach=84% | ε=0.050 | Loss=15.012 | t=5905s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=88%
+          └ 이동 분포: straight=42%  left=47%  right=11%
+Ep 2100/15000 | R= -290.0 | Fuel=1500.3mL | Wait= 317s | Steps=134.4 | Reach=84% | ε=0.050 | Loss=15.052 | t=6098s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=86%
+          └ 이동 분포: straight=42%  left=48%  right=10%
+Ep 2200/15000 | R= -231.8 | Fuel=1479.7mL | Wait= 241s | Steps=136.1 | Reach=84% | ε=0.050 | Loss=14.162 | t=6293s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=92%
+          └ 이동 분포: straight=40%  left=49%  right=10%
+Ep 2300/15000 | R= -185.0 | Fuel=1424.3mL | Wait= 259s | Steps=127.6 | Reach=85% | ε=0.050 | Loss=11.643 | t=6483s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=82%
+          └ 이동 분포: straight=42%  left=47%  right=10%
+Ep 2400/15000 | R= -110.2 | Fuel=1449.4mL | Wait= 313s | Steps=110.4 | Reach=91% | ε=0.050 | Loss=11.177 | t=6647s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=90%
+          └ 이동 분포: straight=51%  left=38%  right=11%
+Ep 2500/15000 | R= -366.7 | Fuel=1517.3mL | Wait= 265s | Steps=149.0 | Reach=80% | ε=0.050 | Loss=9.644 | t=6870s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=74%
+          └ 이동 분포: straight=40%  left=52%  right=9%
+Ep 2600/15000 | R= -264.6 | Fuel=1489.2mL | Wait= 284s | Steps=134.0 | Reach=84% | ε=0.050 | Loss=11.340 | t=7072s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=84%
+          └ 이동 분포: straight=41%  left=49%  right=11%
+Ep 2700/15000 | R= -170.0 | Fuel=1411.6mL | Wait= 285s | Steps=123.8 | Reach=86% | ε=0.050 | Loss=9.972 | t=7252s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=86%
+          └ 이동 분포: straight=43%  left=47%  right=10%
+Ep 2800/15000 | R= -174.7 | Fuel=1443.8mL | Wait= 279s | Steps=118.6 | Reach=88% | ε=0.050 | Loss=8.994 | t=7431s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=82%
+          └ 이동 분포: straight=46%  left=43%  right=11%
+Ep 2900/15000 | R= -131.9 | Fuel=1449.9mL | Wait= 261s | Steps=115.7 | Reach=89% | ε=0.050 | Loss=8.898 | t=7605s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=88%
+          └ 이동 분포: straight=49%  left=41%  right=11%
+Ep 3000/15000 | R= -200.4 | Fuel=1480.0mL | Wait= 326s | Steps=117.4 | Reach=88% | ε=0.050 | Loss=9.447 | t=7777s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=88%
+          └ 이동 분포: straight=46%  left=42%  right=12%
+  [체크포인트] model_rl_signal_ep3000.pth
+Ep 3100/15000 | R=  -40.7 | Fuel=1409.0mL | Wait= 295s | Steps=98.7 | Reach=94% | ε=0.050 | Loss=8.809 | t=7926s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=94%
+          └ 이동 분포: straight=57%  left=31%  right=12%
+Ep 3200/15000 | R= -210.7 | Fuel=1460.7mL | Wait= 280s | Steps=127.6 | Reach=85% | ε=0.050 | Loss=8.747 | t=8118s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=86%
+          └ 이동 분포: straight=42%  left=48%  right=10%
+Ep 3300/15000 | R= -136.8 | Fuel=1410.0mL | Wait= 282s | Steps=119.1 | Reach=87% | ε=0.050 | Loss=8.795 | t=8298s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=84%
+          └ 이동 분포: straight=44%  left=46%  right=10%
+Ep 3400/15000 | R= -225.8 | Fuel=1449.7mL | Wait= 260s | Steps=131.9 | Reach=84% | ε=0.050 | Loss=8.422 | t=8499s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=88%
+          └ 이동 분포: straight=41%  left=48%  right=10%
+Ep 3500/15000 | R= -175.5 | Fuel=1419.4mL | Wait= 288s | Steps=123.7 | Reach=86% | ε=0.050 | Loss=8.434 | t=8681s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=88%
+          └ 이동 분포: straight=44%  left=46%  right=10%
+Ep 3600/15000 | R= -187.5 | Fuel=1581.0mL | Wait= 355s | Steps=100.2 | Reach=94% | ε=0.050 | Loss=13.753 | t=8832s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=92%
+          └ 이동 분포: straight=58%  left=27%  right=14%
+Ep 3700/15000 | R=  -68.7 | Fuel=1403.7mL | Wait= 445s | Steps=93.9 | Reach=92% | ε=0.050 | Loss=12.409 | t=8980s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=94%
+          └ 이동 분포: straight=50%  left=38%  right=11%
+Ep 3800/15000 | R= -244.8 | Fuel=1452.9mL | Wait= 419s | Steps=125.6 | Reach=82% | ε=0.050 | Loss=10.904 | t=9172s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=74%
+          └ 이동 분포: straight=36%  left=54%  right=9%
+Ep 3900/15000 | R= -144.7 | Fuel=1421.1mL | Wait= 371s | Steps=109.7 | Reach=87% | ε=0.050 | Loss=11.247 | t=9338s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=90%
+          └ 이동 분포: straight=42%  left=47%  right=10%
+Ep 4000/15000 | R= -216.1 | Fuel=1414.3mL | Wait= 270s | Steps=133.2 | Reach=83% | ε=0.050 | Loss=9.239 | t=9540s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=76%
+          └ 이동 분포: straight=40%  left=51%  right=10%
+Ep 4100/15000 | R= -123.1 | Fuel=1403.5mL | Wait= 291s | Steps=116.3 | Reach=87% | ε=0.050 | Loss=8.738 | t=9715s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=88%
+          └ 이동 분포: straight=44%  left=46%  right=10%
+Ep 4200/15000 | R= -200.9 | Fuel=1417.3mL | Wait= 319s | Steps=123.5 | Reach=84% | ε=0.050 | Loss=9.699 | t=9911s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=88%
+          └ 이동 분포: straight=40%  left=51%  right=9%
+Ep 4300/15000 | R= -194.2 | Fuel=1396.2mL | Wait= 326s | Steps=123.4 | Reach=84% | ε=0.050 | Loss=7.270 | t=10104s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=80%
+          └ 이동 분포: straight=40%  left=51%  right=10%
+Ep 4400/15000 | R= -192.3 | Fuel=1416.7mL | Wait= 413s | Steps=113.6 | Reach=85% | ε=0.050 | Loss=7.636 | t=10269s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=84%
+          └ 이동 분포: straight=41%  left=49%  right=10%
+Ep 4500/15000 | R= -245.5 | Fuel=1411.2mL | Wait= 328s | Steps=134.9 | Reach=80% | ε=0.050 | Loss=6.214 | t=10476s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=80%
+          └ 이동 분포: straight=34%  left=57%  right=9%
+  [체크포인트] model_rl_signal_ep4500.pth
+Ep 4600/15000 | R= -154.5 | Fuel=1448.4mL | Wait= 381s | Steps=110.4 | Reach=88% | ε=0.050 | Loss=7.447 | t=10644s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=86%
+          └ 이동 분포: straight=45%  left=45%  right=11%
+Ep 4700/15000 | R= -250.9 | Fuel=1404.2mL | Wait= 301s | Steps=133.4 | Reach=81% | ε=0.050 | Loss=7.114 | t=10830s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=82%
+          └ 이동 분포: straight=37%  left=55%  right=9%
+Ep 4800/15000 | R=  -85.5 | Fuel=1408.4mL | Wait= 308s | Steps=104.3 | Reach=90% | ε=0.050 | Loss=6.917 | t=10987s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=86%
+          └ 이동 분포: straight=49%  left=40%  right=11%
+Ep 4900/15000 | R= -136.0 | Fuel=1414.0mL | Wait= 315s | Steps=112.1 | Reach=88% | ε=0.050 | Loss=8.134 | t=11149s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=88%
+          └ 이동 분포: straight=45%  left=44%  right=10%
+Ep 5000/15000 | R= -190.9 | Fuel=1446.6mL | Wait= 315s | Steps=117.4 | Reach=86% | ε=0.050 | Loss=7.786 | t=11330s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=86%
+          └ 이동 분포: straight=42%  left=48%  right=11%
+Ep 5100/15000 | R= -189.9 | Fuel=1420.9mL | Wait= 327s | Steps=116.7 | Reach=86% | ε=0.050 | Loss=7.674 | t=11503s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=82%
+          └ 이동 분포: straight=41%  left=48%  right=11%
+Ep 5200/15000 | R= -205.4 | Fuel=1410.6mL | Wait= 299s | Steps=123.6 | Reach=83% | ε=0.050 | Loss=8.799 | t=11697s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=84%
+          └ 이동 분포: straight=37%  left=54%  right=9%
+Ep 5300/15000 | R=  -68.5 | Fuel=1383.9mL | Wait= 343s | Steps=97.9 | Reach=90% | ε=0.050 | Loss=8.399 | t=11843s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=88%
+          └ 이동 분포: straight=47%  left=43%  right=10%
+Ep 5400/15000 | R= -146.6 | Fuel=1387.9mL | Wait= 327s | Steps=112.8 | Reach=86% | ε=0.050 | Loss=7.758 | t=12011s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=84%
+          └ 이동 분포: straight=41%  left=49%  right=10%
+Ep 5500/15000 | R=  -84.5 | Fuel=1400.5mL | Wait= 293s | Steps=101.5 | Reach=89% | ε=0.050 | Loss=8.116 | t=12164s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=84%
+          └ 이동 분포: straight=45%  left=45%  right=10%
+Ep 5600/15000 | R= -262.7 | Fuel=1501.3mL | Wait= 269s | Steps=120.7 | Reach=84% | ε=0.050 | Loss=8.959 | t=12347s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=88%
+          └ 이동 분포: straight=41%  left=49%  right=11%
+Ep 5700/15000 | R= -177.4 | Fuel=1431.1mL | Wait= 279s | Steps=113.0 | Reach=86% | ε=0.050 | Loss=10.209 | t=12514s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=84%
+          └ 이동 분포: straight=41%  left=50%  right=10%
+Ep 5800/15000 | R= -286.5 | Fuel=1512.3mL | Wait= 358s | Steps=116.9 | Reach=85% | ε=0.050 | Loss=11.337 | t=12690s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=86%
+          └ 이동 분포: straight=41%  left=48%  right=11%
+Ep 5900/15000 | R=  -93.2 | Fuel=1385.0mL | Wait= 336s | Steps=97.8 | Reach=90% | ε=0.050 | Loss=10.617 | t=12835s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=88%
+          └ 이동 분포: straight=47%  left=43%  right=11%
+Ep 6000/15000 | R= -140.8 | Fuel=1427.9mL | Wait= 314s | Steps=105.4 | Reach=88% | ε=0.050 | Loss=11.927 | t=12985s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=88%
+          └ 이동 분포: straight=45%  left=43%  right=12%
+  [체크포인트] model_rl_signal_ep6000.pth
+Ep 6100/15000 | R= -247.9 | Fuel=1412.7mL | Wait= 239s | Steps=130.3 | Reach=80% | ε=0.050 | Loss=11.659 | t=13181s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=84%
+          └ 이동 분포: straight=34%  left=58%  right=8%
+Ep 6200/15000 | R= -259.6 | Fuel=1417.9mL | Wait= 274s | Steps=130.1 | Reach=80% | ε=0.050 | Loss=10.155 | t=13372s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=82%
+          └ 이동 분포: straight=34%  left=57%  right=8%
+Ep 6300/15000 | R= -138.9 | Fuel=1398.8mL | Wait= 275s | Steps=110.2 | Reach=86% | ε=0.050 | Loss=9.516 | t=13539s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=88%
+          └ 이동 분포: straight=42%  left=49%  right=9%
+Ep 6400/15000 | R= -350.7 | Fuel=1451.6mL | Wait= 267s | Steps=138.1 | Reach=78% | ε=0.050 | Loss=9.498 | t=13743s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=74%
+          └ 이동 분포: straight=32%  left=58%  right=9%
+Ep 6500/15000 | R= -199.2 | Fuel=1397.9mL | Wait= 304s | Steps=122.6 | Reach=83% | ε=0.050 | Loss=8.608 | t=13933s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=80%
+          └ 이동 분포: straight=37%  left=54%  right=9%
+Ep 6600/15000 | R= -173.9 | Fuel=1389.0mL | Wait= 301s | Steps=118.8 | Reach=84% | ε=0.050 | Loss=8.606 | t=14109s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=82%
+          └ 이동 분포: straight=38%  left=53%  right=9%
+Ep 6700/15000 | R= -121.9 | Fuel=1364.9mL | Wait= 275s | Steps=107.3 | Reach=87% | ε=0.050 | Loss=8.158 | t=14271s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=94%
+          └ 이동 분포: straight=42%  left=48%  right=10%
+Ep 6800/15000 | R= -224.3 | Fuel=1459.7mL | Wait= 295s | Steps=116.1 | Reach=85% | ε=0.050 | Loss=8.982 | t=14449s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=86%
+          └ 이동 분포: straight=40%  left=51%  right=10%
+Ep 6900/15000 | R= -211.1 | Fuel=1403.7mL | Wait= 300s | Steps=120.7 | Reach=83% | ε=0.050 | Loss=8.957 | t=14632s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=80%
+          └ 이동 분포: straight=36%  left=55%  right=9%
+Ep 7000/15000 | R= -168.7 | Fuel=1426.4mL | Wait= 281s | Steps=114.3 | Reach=85% | ε=0.050 | Loss=9.125 | t=14810s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=82%
+          └ 이동 분포: straight=39%  left=51%  right=9%
+Ep 7100/15000 | R= -138.6 | Fuel=1376.1mL | Wait= 260s | Steps=112.9 | Reach=85% | ε=0.050 | Loss=8.247 | t=14978s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=86%
+          └ 이동 분포: straight=39%  left=52%  right=9%
+Ep 7200/15000 | R= -215.4 | Fuel=1406.1mL | Wait= 293s | Steps=121.6 | Reach=83% | ε=0.050 | Loss=8.587 | t=15162s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=84%
+          └ 이동 분포: straight=37%  left=53%  right=10%
+Ep 7300/15000 | R=  -53.5 | Fuel=1373.9mL | Wait= 310s | Steps=93.2 | Reach=91% | ε=0.050 | Loss=8.913 | t=15305s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=90%
+          └ 이동 분포: straight=49%  left=40%  right=11%
+Ep 7400/15000 | R=  -65.7 | Fuel=1375.0mL | Wait= 297s | Steps=96.0 | Reach=90% | ε=0.050 | Loss=8.613 | t=15447s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=90%
+          └ 이동 분포: straight=46%  left=43%  right=11%
+Ep 7500/15000 | R= -120.4 | Fuel=1405.4mL | Wait= 301s | Steps=102.7 | Reach=88% | ε=0.050 | Loss=8.481 | t=15606s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=84%
+          └ 이동 분포: straight=44%  left=46%  right=10%
+  [체크포인트] model_rl_signal_ep7500.pth
+Ep 7600/15000 | R= -156.5 | Fuel=1405.2mL | Wait= 270s | Steps=114.0 | Reach=85% | ε=0.050 | Loss=9.880 | t=15778s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=90%
+          └ 이동 분포: straight=38%  left=52%  right=10%
+Ep 7700/15000 | R= -176.9 | Fuel=1385.0mL | Wait= 250s | Steps=120.7 | Reach=83% | ε=0.050 | Loss=8.539 | t=15959s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=86%
+          └ 이동 분포: straight=37%  left=54%  right=9%
+Ep 7800/15000 | R= -126.4 | Fuel=1393.1mL | Wait= 269s | Steps=107.3 | Reach=87% | ε=0.050 | Loss=8.920 | t=16124s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=86%
+          └ 이동 분포: straight=42%  left=48%  right=10%
+Ep 7900/15000 | R= -179.3 | Fuel=1411.4mL | Wait= 272s | Steps=118.0 | Reach=84% | ε=0.050 | Loss=9.078 | t=16306s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=88%
+          └ 이동 분포: straight=37%  left=53%  right=10%
+Ep 8000/15000 | R= -245.9 | Fuel=1434.0mL | Wait= 319s | Steps=121.4 | Reach=83% | ε=0.050 | Loss=8.951 | t=16497s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=84%
+          └ 이동 분포: straight=38%  left=52%  right=10%
+Ep 8100/15000 | R= -106.7 | Fuel=1412.5mL | Wait= 296s | Steps=102.9 | Reach=88% | ε=0.050 | Loss=9.334 | t=16654s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=78%
+          └ 이동 분포: straight=44%  left=45%  right=10%
+Ep 8200/15000 | R= -272.9 | Fuel=1417.4mL | Wait= 255s | Steps=134.4 | Reach=79% | ε=0.050 | Loss=8.466 | t=16855s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=80%
+          └ 이동 분포: straight=32%  left=60%  right=9%
+Ep 8300/15000 | R= -111.8 | Fuel=1407.4mL | Wait= 306s | Steps=100.1 | Reach=89% | ε=0.050 | Loss=9.306 | t=17001s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=96%
+          └ 이동 분포: straight=45%  left=44%  right=10%
+Ep 8400/15000 | R= -230.6 | Fuel=1389.2mL | Wait= 251s | Steps=127.6 | Reach=81% | ε=0.050 | Loss=8.386 | t=17192s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=86%
+          └ 이동 분포: straight=35%  left=56%  right=9%
+Ep 8500/15000 | R=  -91.3 | Fuel=1384.1mL | Wait= 289s | Steps=103.8 | Reach=88% | ε=0.050 | Loss=8.415 | t=17356s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=86%
+          └ 이동 분포: straight=42%  left=48%  right=10%
+Ep 8600/15000 | R=  -65.9 | Fuel=1405.2mL | Wait= 277s | Steps=94.3 | Reach=91% | ε=0.050 | Loss=8.749 | t=17496s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=94%
+          └ 이동 분포: straight=49%  left=40%  right=11%
+Ep 8700/15000 | R= -119.0 | Fuel=1360.6mL | Wait= 283s | Steps=109.8 | Reach=86% | ε=0.050 | Loss=8.550 | t=17671s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=80%
+          └ 이동 분포: straight=41%  left=50%  right=10%
+Ep 8800/15000 | R= -223.1 | Fuel=1384.4mL | Wait= 261s | Steps=127.4 | Reach=81% | ε=0.050 | Loss=7.429 | t=17864s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=84%
+          └ 이동 분포: straight=34%  left=57%  right=9%
+Ep 8900/15000 | R= -165.6 | Fuel=1397.6mL | Wait= 324s | Steps=109.5 | Reach=87% | ε=0.050 | Loss=8.643 | t=18028s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=90%
+          └ 이동 분포: straight=41%  left=48%  right=11%
+Ep 9000/15000 | R= -177.0 | Fuel=1427.6mL | Wait= 263s | Steps=113.2 | Reach=85% | ε=0.050 | Loss=7.949 | t=18211s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=82%
+          └ 이동 분포: straight=40%  left=50%  right=10%
+  [체크포인트] model_rl_signal_ep9000.pth
+Ep 9100/15000 | R= -177.4 | Fuel=1411.0mL | Wait= 276s | Steps=113.9 | Reach=85% | ε=0.050 | Loss=8.107 | t=18387s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=90%
+          └ 이동 분포: straight=38%  left=52%  right=10%
+Ep 9200/15000 | R=  -94.7 | Fuel=1400.6mL | Wait= 300s | Steps=102.8 | Reach=88% | ε=0.050 | Loss=8.222 | t=18540s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=92%
+          └ 이동 분포: straight=44%  left=46%  right=10%
+Ep 9300/15000 | R= -221.2 | Fuel=1401.8mL | Wait= 277s | Steps=123.9 | Reach=82% | ε=0.050 | Loss=8.000 | t=18727s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=82%
+          └ 이동 분포: straight=35%  left=56%  right=9%
+Ep 9400/15000 | R=  -77.9 | Fuel=1384.3mL | Wait= 301s | Steps=101.2 | Reach=89% | ε=0.050 | Loss=8.993 | t=18880s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=88%
+          └ 이동 분포: straight=45%  left=45%  right=10%
+Ep 9500/15000 | R= -126.1 | Fuel=1392.9mL | Wait= 286s | Steps=111.5 | Reach=86% | ε=0.050 | Loss=8.142 | t=19057s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=86%
+          └ 이동 분포: straight=42%  left=48%  right=10%
+Ep 9600/15000 | R= -134.3 | Fuel=1407.3mL | Wait= 284s | Steps=107.1 | Reach=87% | ε=0.050 | Loss=8.437 | t=19217s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=86%
+          └ 이동 분포: straight=42%  left=48%  right=10%
+Ep 9700/15000 | R= -151.0 | Fuel=1380.1mL | Wait= 280s | Steps=112.8 | Reach=85% | ε=0.050 | Loss=7.816 | t=19390s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=80%
+          └ 이동 분포: straight=39%  left=52%  right=9%
+Ep 9800/15000 | R= -170.1 | Fuel=1413.2mL | Wait= 275s | Steps=112.2 | Reach=86% | ε=0.050 | Loss=9.511 | t=19566s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=84%
+          └ 이동 분포: straight=41%  left=49%  right=10%
+Ep 9900/15000 | R=    1.4 | Fuel=1377.7mL | Wait= 307s | Steps=87.3 | Reach=93% | ε=0.050 | Loss=8.968 | t=19704s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=94%
+          └ 이동 분포: straight=54%  left=35%  right=11%
+Ep 10000/15000 | R= -106.0 | Fuel=1403.6mL | Wait= 285s | Steps=104.2 | Reach=88% | ε=0.050 | Loss=8.369 | t=19868s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=88%
+          └ 이동 분포: straight=44%  left=46%  right=10%
+Ep 10100/15000 | R= -122.4 | Fuel=1399.0mL | Wait= 324s | Steps=105.3 | Reach=89% | ε=0.050 | Loss=9.650 | t=20035s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=90%
+          └ 이동 분포: straight=46%  left=43%  right=11%
+Ep 10200/15000 | R= -101.9 | Fuel=1386.6mL | Wait= 294s | Steps=108.7 | Reach=87% | ε=0.050 | Loss=8.502 | t=20206s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=80%
+          └ 이동 분포: straight=42%  left=48%  right=10%
+Ep 10300/15000 | R= -159.9 | Fuel=1397.4mL | Wait= 276s | Steps=115.2 | Reach=85% | ε=0.050 | Loss=8.514 | t=20386s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=90%
+          └ 이동 분포: straight=40%  left=50%  right=10%
+Ep 10400/15000 | R= -178.6 | Fuel=1393.9mL | Wait= 249s | Steps=120.2 | Reach=83% | ε=0.050 | Loss=7.883 | t=20568s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=82%
+          └ 이동 분포: straight=37%  left=54%  right=9%
+Ep 10500/15000 | R=  -64.8 | Fuel=1393.3mL | Wait= 286s | Steps=96.6 | Reach=90% | ε=0.050 | Loss=8.367 | t=20715s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=92%
+          └ 이동 분포: straight=47%  left=43%  right=11%
+  [체크포인트] model_rl_signal_ep10500.pth
+Ep 10600/15000 | R= -168.5 | Fuel=1431.1mL | Wait= 254s | Steps=113.7 | Reach=85% | ε=0.050 | Loss=8.413 | t=20890s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=88%
+          └ 이동 분포: straight=39%  left=51%  right=9%
+Ep 10700/15000 | R= -164.3 | Fuel=1377.1mL | Wait= 250s | Steps=121.2 | Reach=83% | ε=0.050 | Loss=7.595 | t=21080s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=80%
+          └ 이동 분포: straight=37%  left=54%  right=9%
+Ep 10800/15000 | R= -252.4 | Fuel=1435.7mL | Wait= 301s | Steps=123.2 | Reach=83% | ε=0.050 | Loss=8.610 | t=21269s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=86%
+          └ 이동 분포: straight=38%  left=53%  right=10%
+Ep 10900/15000 | R=  -68.3 | Fuel=1372.0mL | Wait= 322s | Steps=97.9 | Reach=90% | ε=0.050 | Loss=8.736 | t=21416s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=96%
+          └ 이동 분포: straight=46%  left=44%  right=11%
+Ep 11000/15000 | R= -332.5 | Fuel=1414.6mL | Wait= 256s | Steps=144.4 | Reach=76% | ε=0.050 | Loss=7.613 | t=21636s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=74%
+          └ 이동 분포: straight=30%  left=62%  right=8%
+Ep 11100/15000 | R=  -93.2 | Fuel=1449.6mL | Wait= 339s | Steps=90.8 | Reach=92% | ε=0.050 | Loss=8.631 | t=21766s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=92%
+          └ 이동 분포: straight=52%  left=35%  right=13%
+Ep 11200/15000 | R= -113.9 | Fuel=1367.4mL | Wait= 287s | Steps=110.7 | Reach=86% | ε=0.050 | Loss=8.632 | t=21929s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=88%
+          └ 이동 분포: straight=41%  left=50%  right=10%
+Ep 11300/15000 | R= -138.7 | Fuel=1400.2mL | Wait= 288s | Steps=111.8 | Reach=86% | ε=0.050 | Loss=7.980 | t=22092s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=88%
+          └ 이동 분포: straight=41%  left=50%  right=10%
+Ep 11400/15000 | R=  -84.4 | Fuel=1378.8mL | Wait= 326s | Steps=103.7 | Reach=89% | ε=0.050 | Loss=8.556 | t=22246s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=92%
+          └ 이동 분포: straight=45%  left=44%  right=11%
+Ep 11500/15000 | R= -295.3 | Fuel=1413.4mL | Wait= 233s | Steps=140.3 | Reach=77% | ε=0.050 | Loss=7.047 | t=22453s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=82%
+          └ 이동 분포: straight=31%  left=61%  right=8%
+Ep 11600/15000 | R= -159.5 | Fuel=1392.3mL | Wait= 280s | Steps=116.8 | Reach=84% | ε=0.050 | Loss=6.721 | t=22630s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=86%
+          └ 이동 분포: straight=37%  left=53%  right=9%
+Ep 11700/15000 | R=  -78.7 | Fuel=1346.0mL | Wait= 303s | Steps=104.2 | Reach=88% | ε=0.050 | Loss=7.574 | t=22789s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=92%
+          └ 이동 분포: straight=43%  left=47%  right=10%
+Ep 11800/15000 | R= -110.1 | Fuel=1365.2mL | Wait= 320s | Steps=107.6 | Reach=87% | ε=0.050 | Loss=7.421 | t=22948s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=86%
+          └ 이동 분포: straight=42%  left=48%  right=10%
+Ep 11900/15000 | R= -105.4 | Fuel=1384.4mL | Wait= 277s | Steps=106.5 | Reach=87% | ε=0.050 | Loss=7.242 | t=23111s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=90%
+          └ 이동 분포: straight=41%  left=48%  right=10%
+Ep 12000/15000 | R= -139.4 | Fuel=1381.0mL | Wait= 297s | Steps=113.3 | Reach=85% | ε=0.050 | Loss=7.127 | t=23281s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=82%
+          └ 이동 분포: straight=38%  left=52%  right=10%
+  [체크포인트] model_rl_signal_ep12000.pth
+Ep 12100/15000 | R= -144.6 | Fuel=1374.3mL | Wait= 332s | Steps=112.9 | Reach=86% | ε=0.050 | Loss=7.099 | t=23447s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=84%
+          └ 이동 분포: straight=40%  left=50%  right=10%
+Ep 12200/15000 | R= -185.3 | Fuel=1389.7mL | Wait= 318s | Steps=120.8 | Reach=83% | ε=0.050 | Loss=6.717 | t=23632s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=84%
+          └ 이동 분포: straight=38%  left=54%  right=9%
+Ep 12300/15000 | R= -139.3 | Fuel=1387.7mL | Wait= 286s | Steps=110.9 | Reach=86% | ε=0.050 | Loss=7.413 | t=23811s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=88%
+          └ 이동 분포: straight=40%  left=49%  right=10%
+Ep 12400/15000 | R= -240.3 | Fuel=1413.9mL | Wait= 281s | Steps=131.5 | Reach=80% | ε=0.050 | Loss=6.696 | t=24010s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=78%
+          └ 이동 분포: straight=34%  left=57%  right=9%
+Ep 12500/15000 | R= -224.4 | Fuel=1407.8mL | Wait= 272s | Steps=130.3 | Reach=80% | ε=0.050 | Loss=6.695 | t=24218s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=78%
+          └ 이동 분포: straight=33%  left=58%  right=8%
+Ep 12600/15000 | R= -204.9 | Fuel=1407.2mL | Wait= 294s | Steps=122.6 | Reach=83% | ε=0.050 | Loss=6.738 | t=24412s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=78%
+          └ 이동 분포: straight=36%  left=54%  right=9%
+Ep 12700/15000 | R= -132.2 | Fuel=1394.4mL | Wait= 286s | Steps=111.8 | Reach=86% | ε=0.050 | Loss=7.545 | t=24580s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=92%
+          └ 이동 분포: straight=40%  left=50%  right=10%
+Ep 12800/15000 | R=  -89.8 | Fuel=1395.2mL | Wait= 257s | Steps=104.0 | Reach=88% | ε=0.050 | Loss=7.166 | t=24746s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=86%
+          └ 이동 분포: straight=44%  left=46%  right=10%
+Ep 12900/15000 | R= -234.4 | Fuel=1365.1mL | Wait= 266s | Steps=134.8 | Reach=79% | ε=0.050 | Loss=6.916 | t=24952s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=76%
+          └ 이동 분포: straight=32%  left=59%  right=8%
+Ep 13000/15000 | R= -188.8 | Fuel=1414.6mL | Wait= 325s | Steps=116.7 | Reach=85% | ε=0.050 | Loss=7.384 | t=25133s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=82%
+          └ 이동 분포: straight=39%  left=51%  right=10%
+Ep 13100/15000 | R=  -74.9 | Fuel=1359.3mL | Wait= 279s | Steps=103.7 | Reach=88% | ε=0.050 | Loss=7.624 | t=25285s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=90%
+          └ 이동 분포: straight=43%  left=47%  right=10%
+Ep 13200/15000 | R= -118.7 | Fuel=1384.3mL | Wait= 269s | Steps=109.1 | Reach=86% | ε=0.050 | Loss=7.141 | t=25454s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=84%
+          └ 이동 분포: straight=41%  left=50%  right=9%
+Ep 13300/15000 | R= -184.6 | Fuel=1379.5mL | Wait= 284s | Steps=122.5 | Reach=83% | ε=0.050 | Loss=6.793 | t=25645s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=78%
+          └ 이동 분포: straight=37%  left=54%  right=9%
+Ep 13400/15000 | R=  -75.5 | Fuel=1363.7mL | Wait= 300s | Steps=105.1 | Reach=88% | ε=0.050 | Loss=7.515 | t=25802s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=86%
+          └ 이동 분포: straight=44%  left=46%  right=10%
+Ep 13500/15000 | R= -322.4 | Fuel=1404.7mL | Wait= 281s | Steps=146.2 | Reach=76% | ε=0.050 | Loss=6.844 | t=26061s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=74%
+          └ 이동 분포: straight=31%  left=61%  right=8%
+  [체크포인트] model_rl_signal_ep13500.pth
+Ep 13600/15000 | R= -138.4 | Fuel=1403.2mL | Wait= 269s | Steps=110.8 | Reach=86% | ε=0.050 | Loss=7.624 | t=26236s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=86%
+          └ 이동 분포: straight=41%  left=49%  right=10%
+Ep 13700/15000 | R= -140.2 | Fuel=1364.4mL | Wait= 307s | Steps=111.4 | Reach=86% | ε=0.050 | Loss=7.632 | t=26433s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=88%
+          └ 이동 분포: straight=40%  left=49%  right=10%
+Ep 13800/15000 | R= -124.3 | Fuel=1393.1mL | Wait= 279s | Steps=107.9 | Reach=87% | ε=0.050 | Loss=6.885 | t=26636s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=88%
+          └ 이동 분포: straight=42%  left=47%  right=11%
+Ep 13900/15000 | R=  -74.4 | Fuel=1373.7mL | Wait= 294s | Steps=100.4 | Reach=89% | ε=0.050 | Loss=7.334 | t=26827s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=94%
+          └ 이동 분포: straight=45%  left=45%  right=10%
+Ep 14000/15000 | R= -170.7 | Fuel=1371.0mL | Wait= 293s | Steps=124.3 | Reach=82% | ε=0.050 | Loss=6.877 | t=27042s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=80%
+          └ 이동 분포: straight=35%  left=56%  right=9%
+Ep 14100/15000 | R= -122.6 | Fuel=1378.1mL | Wait= 294s | Steps=110.5 | Reach=86% | ε=0.050 | Loss=7.180 | t=27266s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=84%
+          └ 이동 분포: straight=41%  left=49%  right=10%
+Ep 14200/15000 | R= -182.3 | Fuel=1428.1mL | Wait= 321s | Steps=114.2 | Reach=85% | ε=0.050 | Loss=7.629 | t=27468s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=84%
+          └ 이동 분포: straight=41%  left=49%  right=10%
+Ep 14300/15000 | R= -164.9 | Fuel=1370.7mL | Wait= 286s | Steps=118.4 | Reach=84% | ε=0.050 | Loss=7.207 | t=27696s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=84%
+          └ 이동 분포: straight=38%  left=53%  right=9%
+Ep 14400/15000 | R=  -89.7 | Fuel=1392.8mL | Wait= 264s | Steps=104.4 | Reach=88% | ε=0.050 | Loss=7.611 | t=27908s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=88%
+          └ 이동 분포: straight=42%  left=47%  right=11%
+Ep 14500/15000 | R=  -58.9 | Fuel=1367.5mL | Wait= 325s | Steps=101.4 | Reach=90% | ε=0.050 | Loss=7.246 | t=28113s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=88%
+          └ 이동 분포: straight=46%  left=41%  right=12%
+Ep 14600/15000 | R= -152.9 | Fuel=1393.5mL | Wait= 284s | Steps=116.6 | Reach=85% | ε=0.050 | Loss=6.888 | t=28298s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=92%
+          └ 이동 분포: straight=41%  left=50%  right=9%
+Ep 14700/15000 | R= -147.4 | Fuel=1389.9mL | Wait= 324s | Steps=116.0 | Reach=85% | ε=0.050 | Loss=6.931 | t=28534s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=86%
+          └ 이동 분포: straight=40%  left=51%  right=9%
+Ep 14800/15000 | R= -353.5 | Fuel=1507.6mL | Wait= 329s | Steps=127.4 | Reach=81% | ε=0.050 | Loss=10.846 | t=28798s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=80%
+          └ 이동 분포: straight=36%  left=53%  right=11%
+Ep 14900/15000 | R=  -50.7 | Fuel=1368.4mL | Wait= 296s | Steps=98.3 | Reach=90% | ε=0.050 | Loss=7.497 | t=28979s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=86%
+          └ 이동 분포: straight=47%  left=42%  right=11%
+Ep 15000/15000 | R=  -40.1 | Fuel=1340.2mL | Wait= 290s | Steps=98.5 | Reach=90% | ε=0.050 | Loss=7.781 | t=29176s
+          ├ 토폴로지 도달률(최근50): gangnam_clean_topology=88%
+          └ 이동 분포: straight=46%  left=43%  right=10%
+  [체크포인트] model_rl_signal_ep15000.pth
 
 ============================================================
- 학습 완료 | 최종 도달률(최근200): 64.0%
- 최고 도달률: 77.0%  → model_rl_signal_best.pth
+ 학습 완료 | 최종 도달률(최근200): 90.0%
+ 최고 도달률: 94.0%  → model_rl_signal_best.pth
  모델 저장 → models/model_rl_signal.pth
 ============================================================
 
