@@ -1,0 +1,69 @@
+# config_gangnam_od2.yaml
+# 강남구 OD-2 재실험 — 2026-06-04.
+#
+# 변경 핵심 (OD-1 신논현 재실험 config_gangnam.yaml 대비):
+#   1) 토폴로지 교체: gangnam_clean_topology.json → gangnam_topology_add.json
+#      (신호 노드 231→614개, 좌회전허용 138→259개로 대폭 강화된 신호 토폴로지).
+#      신호가 조밀해질수록 거리최단 corridor 의 대기/연료 폭증 → RL 신호회피 우위↑.
+#   2) OD-2 갱신: 양재역→영동대교(338734→342812) → 도곡역 일대→영동대교(338934→341712).
+#      사유: 좌하단(SW)→우상단(NE) 경향성 유지하면서 '거리최단 ≠ 연료최단' 격차 최대.
+#      사전 Dijkstra 검증(노이즈 제거): peak fuel TDD −20.9% / off-peak −25.4%.
+#      출발 338934 는 무신호 degree-3 (OD-1 의 342695 와 동일 패턴 — 정체 corridor 입구).
+#   3) OD-3(세곡→삼성) 제거 — 사용자 요청. OD-1 은 일반화 참고용으로 유지.
+#   4) primary_boost OD-2 = 4 (OD-2 학습 비중 71%).
+data:
+  topology: data/gangnam_topology_add.json
+  speed: data/gangnam_clean_speed_data.csv
+experiments:
+  models:
+    shortest_dijkstra: true
+    static_fuel_dijkstra: true
+    rl_base: true
+    rl_signal: true
+    rl_signal_attention: true
+  repeat: 30
+  # ── OD 쌍 (첫 항목이 주 실험 경로 = primary_boost 대상) ──
+  routes:
+  - {name: od2_dogok_yeongdong,  start: '338934', goal: '341712', type: long}   # 주 실험
+  - {name: od1_sinnonhyeon_suseo, start: '342695', goal: '613667', type: long}  # 일반화 참고
+  time_slots:
+  - {label: off_peak, start_hour: 7.0}
+  - {label: peak,     start_hour: 8.0}
+output:
+  model_dir: models
+  result_dir: output
+physics:
+  accel_ms2: 2.5
+  ifc_ml_s: 0.5
+  speed_min_kmh: 5.0
+  speed_noise: 0.2
+  v_turn_left_kmh: 30.0
+  v_turn_right_kmh: 20.0
+reward:
+  alpha: 1.0
+  arrival_bonus: 700.0
+  penalty_dead: 0.0
+  penalty_timeout: 0.0
+  uturn_penalty: 20.0          # stub U턴 무한루프 방지 (_train_common.py 에서만 사용)
+train:
+  batch_size: 128
+  checkpoint_every: 1500
+  episodes: 15000              # OD-2 corridor 학습 cardinality 확보 (성능 우선)
+  epsilon_start: 1.0
+  epsilon_min: 0.05
+  epsilon_decay: 0.999975
+  gamma: 0.97
+  log_interval: 100
+  lr: 0.0005
+  memory_size: 80000
+  multi_route: true
+  target_update: 25
+  warmup_steps: 2000
+  train_max_steps: 400
+  shaping_weight: 1500.0
+  topologies:
+  - topology: data/gangnam_topology_add.json
+    speed: data/gangnam_clean_speed_data.csv
+    weight: 1.0
+    use_config_routes: true
+    primary_boost: 4           # OD-2 추가 복제 4회 → 학습 비중 5/7 ≈ 71%

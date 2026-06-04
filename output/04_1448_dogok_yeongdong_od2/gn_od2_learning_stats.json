@@ -1,0 +1,23 @@
+{
+  "rl_base": {
+    "episodes": 15000,
+    "final_reach": 0.845,
+    "final_fuel": 1191.6,
+    "final_wait": 920.6,
+    "elapsed_sec": 15486.7
+  },
+  "rl_signal": {
+    "episodes": 15000,
+    "final_reach": 0.86,
+    "final_fuel": 1177.8,
+    "final_wait": 870.1,
+    "elapsed_sec": 14722.1
+  },
+  "rl_signal_attention": {
+    "episodes": 15000,
+    "final_reach": 0.905,
+    "final_fuel": 1231.9,
+    "final_wait": 918.8,
+    "elapsed_sec": 15482.9
+  }
+}

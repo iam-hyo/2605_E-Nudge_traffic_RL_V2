@@ -1,0 +1,10 @@
+[supervisor-od2] waiting for training done marker output/train_logs/.OD2_TRAIN_DONE
+[supervisor-od2] launcher gone + 3 models present → proceed
+[supervisor-od2] training done Thu Jun  4 02:26:22 PM KST 2026
+[supervisor-od2] all 3 RL models present
+[supervisor-od2] running experiment Thu Jun  4 02:26:22 PM KST 2026
+[supervisor-od2] moved output/04_1426 → output/04_1448_dogok_yeongdong_od2
+[supervisor-od2] learning curves Thu Jun  4 02:48:12 PM KST 2026
+[supervisor-od2] hires PNGs Thu Jun  4 02:48:12 PM KST 2026
+[supervisor-od2] comparison GIF Thu Jun  4 02:48:59 PM KST 2026
+[supervisor-od2] ALL DONE Thu Jun  4 02:56:22 PM KST 2026 → output/04_1448_dogok_yeongdong_od2

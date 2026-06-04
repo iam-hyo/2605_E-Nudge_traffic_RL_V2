@@ -108,8 +108,10 @@ def figure_od_zoom3(gm: GangnamMap, route_short, route_fuel,
 
 
 def main(out_dir: str):
-    cfg = yaml.safe_load(open(ROOT / "config" / "config_gangnam.yaml",
-                              encoding="utf-8"))
+    import os
+    cfg_path = os.environ.get("GANGNAM_CFG",
+                              str(ROOT / "config" / "config_gangnam.yaml"))
+    cfg = yaml.safe_load(open(cfg_path, encoding="utf-8"))
     routes = cfg["experiments"]["routes"]
     env = RoadNetworkEnv(cfg["data"]["topology"], cfg["data"]["speed"],
                          reward_cfg=cfg["reward"], use_signal=True)
