@@ -1,0 +1,66 @@
+# config_multitopo.yaml — 2026-06-08 다중 토폴로지 강건성 학습
+#
+# 목적: 강남 단일학습 모델이 12x12 전이 실패(0% 도달)한 문제 해결.
+#   여러 토폴로지를 섞어 학습 → 분포 커버리지 확대 → 처음 보는 환경에 강건.
+#
+# 설계 (사용자 확정):
+#   · 학습 토폴로지: gangnam_add(30.8% 신호) + 10x10 + 6x6_cross  ← 모두 random routes
+#   · 12x12 는 HOLD-OUT (학습 제외) → unseen 일반화 엄밀 검증용
+#   · 신호 풍부(gangnam_add 30.8%, 6x6_cross 코어신호)로 attention 특기 발휘 환경
+#   · 보상 anneal: uturn/revisit 페널티 후반 감쇠 → 연료최적성 복원
+#   · attention 공정보정: episodes 1.67× (launcher에서 override)
+#
+# 학습:  venv/bin/python util/train_multitopo_launch.py
+# 평가:  in-domain  → main(config_multitopo.yaml)  (gangnam_add 3 OD)
+#        held-out   → main(config_12x12.yaml)       (12x12 diag_main)
+data:
+  topology: data/gangnam_topology_add.json   # in-domain 평가 기준
+  speed: data/gangnam_clean_speed_data.csv
+experiments:
+  models: {shortest_dijkstra: true, static_fuel_dijkstra: true, rl_base: true, rl_signal: true, rl_signal_attention: true}
+  repeat: 30
+  # in-domain 평가 OD (gangnam_add 노드 = gangnam_clean 과 동일 ID)
+  routes:
+  - {name: od1_sinnonhyeon_suseo, start: '342695', goal: '613667', type: long}
+  - {name: od2_yangjae_yeongdong, start: '338734', goal: '342812', type: long}
+  - {name: od3_segok_samsung,    start: '340301', goal: '341509', type: long}
+  time_slots:
+  - {label: off_peak, start_hour: 7.0}
+  - {label: peak,     start_hour: 8.0}
+  # experiment_route/time_slot 미지정 → 3 OD × 2 시간대 전체 평가
+output:
+  model_dir: models
+  result_dir: output
+physics: {accel_ms2: 2.5, ifc_ml_s: 0.5, speed_min_kmh: 5.0, speed_noise: 0.2, v_turn_left_kmh: 30.0, v_turn_right_kmh: 20.0}
+reward:
+  alpha: 1.0
+  arrival_bonus: 700.0
+  penalty_dead: 0.0
+  penalty_timeout: 0.0
+  uturn_penalty: 300.0          # 초반 루프 억제 (anneal 대상)
+  revisit_penalty: 50.0         # 초반 루프 억제 (anneal 대상)
+train:
+  batch_size: 128
+  checkpoint_every: 2500
+  episodes: 15000               # base/signal (attention은 launcher가 25000으로 override)
+  epsilon_start: 1.0
+  epsilon_min: 0.05
+  epsilon_decay: 0.999975
+  gamma: 0.97
+  log_interval: 100
+  lr: 0.0005
+  memory_size: 80000
+  multi_route: true
+  target_update: 25
+  warmup_steps: 2000
+  train_max_steps: 300
+  shaping_weight: 1500.0
+  dynamic_od_boost: false       # random routes 사용 → OD 부스트 비활성
+  # ── 보상 anneal (사용자 확정) ──
+  penalty_anneal_frac: 0.6      # 전체의 60%까지 페널티 1.0→floor 선형 감쇠 후 유지
+  penalty_floor: 0.15           # 후반엔 초기 페널티의 15%만 (루프 최소억제 + fuel 지배)
+  # ── 다중 토폴로지 (12x12 hold-out) — 모두 random routes (일반화) ──
+  topologies:
+  - {topology: data/gangnam_topology_add.json, speed: data/gangnam_clean_speed_data.csv, weight: 0.50, n_random_routes: 20}
+  - {topology: data/10x10_topology.json,       speed: data/10x10_speed_data.csv,         weight: 0.30, n_random_routes: 16}
+  - {topology: data/6x6_cross_topology.json,   speed: data/6x6_cross_speed_data.csv,     weight: 0.20, n_random_routes: 12}

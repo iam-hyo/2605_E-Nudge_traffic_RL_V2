@@ -1,0 +1,66 @@
+=== IMAGE-GENERATION PROMPT (paste into an image / infographic generator) ===
+
+Create a clean, professional ACADEMIC INFOGRAPHIC (journal "Figure 1" style,
+similar to an MDPI Sensors deep-reinforcement-learning framework diagram).
+Flat vector illustration, WHITE background, soft muted palette (navy #2f5d8a,
+teal #3a6b5c, slate gray, warm amber accent), thin rounded-rectangle module
+boxes joined by clean arrows, generous whitespace, aligned grid, NO photorealism,
+NO clutter. ALL on-figure text labels MUST be in KOREAN (exact strings given
+at the bottom). Large, legible labels.
+
+TOPIC: A reinforcement-learning system that finds the MINIMUM-FUEL driving route
+through a city by reacting to TRAFFIC SIGNALS and real-time ROAD SPEEDS, using a
+Deep Q-Network (DQN). The agent only knows AVERAGE road speed (not the real
+instantaneous speed), so it must decide under uncertainty.
+
+COMPOSITION — left-to-right pipeline forming a closed feedback loop:
+
+(1) LEFT — "환경 (도로망 시뮬레이터)" :
+    A stylized TOP-DOWN CITY ROAD MAP (grid of streets with intersections).
+    Show a small CAR icon driving on a road; several TRAFFIC LIGHTS (some red,
+    some green) at intersections; subtle speed markers on road segments; a small
+    FUEL DROPLET / fuel-gauge icon. This block represents live road conditions
+    (signals + speeds). Caption beneath: "신호 현시 · 실시간 속도".
+
+(2) CENTER — "강화학습 에이전트 (DQN)" : a large container holding THREE stacked
+    sub-blocks (top to bottom):
+      a. "상태 (190차원)" : a small VECTOR/GRID of cells next to a tiny BRANCHING
+         TREE (1→2→3 hops) depicting the car's local lookahead — each branch
+         tagged with traffic-signal PASS PROBABILITY, expected wait, and road
+         speed for nearby road segments.
+      b. "심층 Q 신경망 (Double · Dueling DQN)" : a clear DEEP NEURAL NETWORK
+         drawing — an input layer of many nodes, 2–3 hidden layers of connected
+         circles with weighted edges, and a small OUTPUT layer of Q-values
+         (4 outputs). It must visually read as a neural network.
+      c. "행동 (다음 도로 선택)" : selecting the next road segment.
+
+(3) RL FEEDBACK LOOP : two curved arrows forming a cycle between the Environment
+    and the Agent. Arrow from environment to agent labeled "상태 sₜ · 보상 rₜ";
+    arrow from agent back to environment labeled "행동 aₜ".
+
+(4) BOTTOM — "보상 : 연료 절약 (정지 회피)" : a thin strip with a FUEL DROPLET
+    icon and a "no-stop / avoid stop-and-go" motif (a crossed-out stop sign or a
+    smooth-vs-jagged speed curve).
+
+(5) RIGHT — "배포 : 전체 경로 생성" : the chosen LOW-FUEL ROUTE highlighted as a
+    colored path on a small copy of the city map.
+
+MANDATORY VISUAL MOTIFS (must all appear): a CAR, a ROAD-NETWORK / intersection
+map with TRAFFIC SIGNALS, a layered NEURAL NETWORK, a FUEL droplet, and arrows
+forming an agent–environment loop.
+
+EXACT KOREAN LABELS TO RENDER:
+  • 신호·속도 인지 강화학습 기반 최소연료 경로 탐색   (title, top)
+  • 환경 (도로망 시뮬레이터)
+  • 신호 현시 · 실시간 속도
+  • 강화학습 에이전트 (DQN)
+  • 상태 (190차원) : 통과확률 · 예상대기 · 속도
+  • 심층 Q 신경망 (Double · Dueling DQN)
+  • 행동 : 다음 도로 선택
+  • 보상 : 연료 절약 (정지 회피)
+  • 배포 : 전체 경로 생성
+  • 상태 sₜ · 보상 rₜ
+  • 행동 aₜ
+
+STYLE NOTES: flat 2D infographic, vector, rounded corners, soft drop shadows OK,
+consistent line weights, academic and minimal — suitable for a research paper.

@@ -51,7 +51,8 @@ IDX_HOP1_NODES_END = IDX_CUR_SIG_END + K_HOP1 * NODE_DIM      # 61
 IDX_HOP1_LINKS_END = IDX_HOP1_NODES_END + K_HOP1 * LINK1_DIM  # 69
 IDX_HOP2_NODES_END = IDX_HOP1_LINKS_END + N_HOP2 * NODE_DIM   # 157
 IDX_HOP2_LINKS_END = IDX_HOP2_NODES_END + L_HOP2 * LINK2_DIM  # 229
-STATE_SIZE         = IDX_HOP2_LINKS_END                        # 229
+STATE_SIZE         = 258   # v3 경로트리 확률 State + to_visited (environment.py 와 동기)
+EDGE_TOK_DIM       = 13     # attention 토큰: 8피처 + to_visited(1) + hop_onehot(3) + parent(1)
 
 # Attention 모델용
 NODE_TOK_DIM   = NODE_DIM + 3        # +hop_onehot[3] → 14
@@ -104,8 +105,9 @@ class QNetworkBase(nn.Module):
         return x
 
     def forward(self, state: torch.Tensor) -> torch.Tensor:
-        x = self._mask_signal(state)
-        x = F.relu(self.fc1(x))
+        # v3: base/signal 구분은 environment.use_signal(=pass_prob·정지연료 제거)
+        # 에서 State 생성 단계에 처리. 네트워크는 동일한 flat MLP.
+        x = F.relu(self.fc1(state))
         x = F.relu(self.fc2(x))
         return _q_from_dueling(self.value(x), self.adv(x))
 
@@ -255,6 +257,51 @@ class QNetworkAttention(nn.Module):
         return _q_from_dueling(self.value(fused), self.adv(fused))
 
 
+# ── Attention 모델 v3 (258d 경로트리 엣지 토큰) ───────────────────────────────
+class QNetworkAttentionV3(nn.Module):
+    """258d 경로트리 State → 28 엣지 토큰(1·2·3-hop = 4·8·16)에 cross-attention.
+    토큰 13d = 8피처 + to_visited(1) + hop_onehot(3) + parent(1).
+    글로벌(6d) 쿼리가 엣지 토큰에 attend → dueling head(4)."""
+    E = 64
+
+    def __init__(self):
+        super().__init__()
+        self.tok_enc = nn.Sequential(nn.Linear(EDGE_TOK_DIM, self.E), nn.ReLU())
+        self.q_enc   = nn.Sequential(nn.Linear(6, self.E), nn.ReLU())
+        self.g_enc   = nn.Sequential(nn.Linear(6, self.E), nn.ReLU())
+        self.attn    = nn.MultiheadAttention(self.E, 4, batch_first=True)
+        self.value, self.adv = _dueling_head(self.E * 2, ACTION_DIM)
+
+    @staticmethod
+    def _tokens(state: torch.Tensor):
+        B = state.shape[0]; dev = state.device
+        g   = state[:, 0:6]
+        h1  = state[:, 6:38].view(B, 8, 4).transpose(1, 2)        # (B,4,8)
+        h2  = state[:, 38:102].view(B, 8, 8).transpose(1, 2)      # (B,8,8)
+        p2  = state[:, 102:110].unsqueeze(-1)                     # (B,8,1)
+        h3  = state[:, 110:238].view(B, 8, 16).transpose(1, 2)    # (B,16,8)
+        p3  = state[:, 238:254].unsqueeze(-1)                     # (B,16,1)
+        tv1 = state[:, 254:258].unsqueeze(-1)                     # (B,4,1)
+
+        def oh(n, idx):
+            z = torch.zeros(B, n, 3, device=dev); z[:, :, idx] = 1.0; return z
+        z = lambda n: torch.zeros(B, n, 1, device=dev)
+        t1 = torch.cat([h1, tv1,   oh(4, 0),  z(4)],  dim=-1)     # (B,4,13)
+        t2 = torch.cat([h2, z(8),  oh(8, 1),  p2],    dim=-1)     # (B,8,13)
+        t3 = torch.cat([h3, z(16), oh(16, 2), p3],    dim=-1)     # (B,16,13)
+        return g, torch.cat([t1, t2, t3], dim=1)                  # (B,28,13)
+
+    def forward(self, state: torch.Tensor) -> torch.Tensor:
+        g, tok = self._tokens(state)
+        mask = (tok[:, :, 0] < 0.5)        # valid 비트 → 패딩 마스크
+        mask[:, 0] = False                 # 1-hop slot0 보호 (항상 유효)
+        emb = self.tok_enc(tok)            # (B,28,E)
+        q   = self.q_enc(g).unsqueeze(1)   # (B,1,E)
+        a, _ = self.attn(q, emb, emb, key_padding_mask=mask)
+        fused = torch.cat([self.g_enc(g), a.squeeze(1)], dim=1)
+        return _q_from_dueling(self.value(fused), self.adv(fused))
+
+
 # ── 팩토리 함수 ───────────────────────────────────────────────────────────────
 def build_model(mode: str) -> nn.Module:
     """
@@ -268,5 +315,5 @@ def build_model(mode: str) -> nn.Module:
     elif mode == "signal":
         return QNetworkSignal()
     elif mode == "attention":
-        return QNetworkAttention()
+        return QNetworkAttentionV3()
     raise ValueError(f"Unknown mode: {mode}")

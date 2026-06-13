@@ -1,0 +1,51 @@
+# config_gangnam_urban.yaml — 2026-06-09 도심 신호회피 검증 (보정판)
+# 변경: cos(lat) 회전보정 + 연비 캘리브(0.86) 적용 / gangnam_CLEAN(실신호 11.6%, 현실 시간)
+# 학습: RANDOM 경로 (범용 모델) / 테스트: OD 후보탐색서 발굴한 도심 신호회피 3경로
+#   t1 선정릉→대치 (headroom 25.2%, 우회 +5.4%)
+#   t2 역삼→학여울 (20.3%, +4.7%)
+#   t3 신사→대치   (16.8%, +7.7%, 신호밀집 14개)
+# 목적: 거리 거의 그대로 신호만 회피해 연료 절감 → signal 유용성 입증.
+data:
+  topology: data/gangnam_clean_topology.json
+  speed: data/gangnam_clean_speed_data.csv
+experiments:
+  models: {shortest_dijkstra: true, static_fuel_dijkstra: true, rl_base: true, rl_signal: true, rl_signal_attention: true}
+  repeat: 30
+  routes:
+  - {name: t1_seonjeongneung_daechi, start: '341608', goal: '338354', type: long}
+  - {name: t2_yeoksam_hakyeoul,      start: '338267', goal: '338344', type: long}
+  - {name: t3_sinsa_daechi,          start: '341904', goal: '338354', type: long}
+  time_slots:
+  - {label: off_peak, start_hour: 7.0}
+  - {label: peak,     start_hour: 8.0}
+output: {model_dir: models, result_dir: output}
+physics: {accel_ms2: 2.5, ifc_ml_s: 0.5, speed_min_kmh: 5.0, speed_noise: 0.2, v_turn_left_kmh: 30.0, v_turn_right_kmh: 20.0}
+reward:
+  alpha: 1.0
+  arrival_bonus: 700.0
+  penalty_dead: 0.0
+  penalty_timeout: 0.0
+  uturn_penalty: 300.0
+  revisit_penalty: 50.0
+train:
+  batch_size: 128
+  checkpoint_every: 2500
+  episodes: 15000
+  epsilon_start: 1.0
+  epsilon_min: 0.05
+  epsilon_decay: 0.99997
+  gamma: 0.97
+  log_interval: 100
+  lr: 0.0005
+  memory_size: 80000
+  multi_route: true
+  target_update: 25
+  warmup_steps: 2000
+  train_max_steps: 300
+  shaping_weight: 0.0
+  dynamic_od_boost: false
+  fuel_shaping_weight: 1500.0
+  penalty_anneal_frac: 0.5      # 후반 연료최적성 회복
+  penalty_floor: 0.2
+  topologies:
+  - {topology: data/gangnam_clean_topology.json, speed: data/gangnam_clean_speed_data.csv, weight: 1.0, n_random_routes: 30}

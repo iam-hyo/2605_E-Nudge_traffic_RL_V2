@@ -49,9 +49,16 @@ reward:
   penalty_dead: 0.0
   penalty_timeout: 0.0
   # ── U턴 페널티 (이전 OD-3 stub trap 실패 해소) ──
-  # _train_common.py 에서만 사용. info.movement == "uturn" 일 때 -uturn_penalty
-  # 만큼 추가 부과 (eval 시 Dijkstra는 U턴 없음 — 영향 없음).
-  uturn_penalty: 20.0
+  # _train_common.py 학습 루프에서만 사용. info.movement == "uturn" 일 때
+  # -uturn_penalty 만큼 부과 (eval 시 Dijkstra는 U턴 없음 — baseline 영향 없음).
+  # 20→300 대폭 상향: dynamics(속도)는 안 건드리고 보상으로 U턴을 확실히 억제.
+  #   단일 링크 연료 ≈ 30~80 mL, arrival_bonus 700 대비 U턴 1회 -300 → 정책이
+  #   stub 진입·왕복을 강하게 회피하도록 학습. (degree-1 막다른 길의 강제 U턴은
+  #   유일 행동이라 어차피 실행되지만, 그 페널티가 "stub 진입" 결정으로 역전파됨.)
+  uturn_penalty: 300.0
+  # ── 재방문 패널티 — 같은 노드 재진입 시 부과 (루프 억제) ──
+  # 정상 경로는 노드를 1회만 방문 → 페널티 0. 루프는 누적 폭증 → 강한 억제.
+  revisit_penalty: 50.0
 train:
   batch_size: 128
   checkpoint_every: 1500       # best.pth overshoot/drift 방지 (보고서 §10.3)
@@ -68,9 +75,15 @@ train:
   warmup_steps: 2000
   train_max_steps: 400         # 우회 corridor (~10km, ~80~120 step) 대비 4~5배 여유
   shaping_weight: 1500.0       # 텔레스코핑 합 = w·(d_start−d_end)/map_diag, policy invariance 유지
+  # ── 동적 OD 부스트 — 도달률 낮은 OD 를 자동으로 더 자주 학습 ──
+  # 정적 primary_boost(첫 OD 복제)는 비활성. 학습 루프가 매 에피소드 OD별
+  # 최근 도달률(최근200)을 보고 weight = max(floor, 1-reach) 로 역가중 샘플링.
+  # → OD-3 처럼 못 푸는 OD 의 학습 비중이 자동으로 올라감 (사용자 의도).
+  dynamic_od_boost: true
+  od_boost_floor: 0.15         # 이미 잘 푸는 OD 도 최소 비중 유지(망각 방지)
   topologies:
   - topology: data/gangnam_clean_topology.json
     speed: data/gangnam_clean_speed_data.csv
     weight: 1.0
     use_config_routes: true
-    primary_boost: 4           # OD-1 추가 복제 4회 → 학습 비중 5/7 ≈ 71%
+    primary_boost: 0           # 동적 부스트 사용 → 정적 복제 0

@@ -1,0 +1,53 @@
+# config_gangnam_v3.yaml — 2026-06-11 v3 경로트리 확률 State + POMDP 환경
+# 환경 변경(보고서 필수 기입):
+#   1) State 254d: 경로트리(1·2·3-hop = 4·8·16 경로), 엣지별 8피처
+#      (valid·mv_l/r·통과확률·평균속도·길이·예상연료·목표접근) + 시계열 parent
+#   2) POMDP: State는 speed.csv 평균속도만 관측(실주행속도 은닉) → 통과가 확률
+#   3) 신호 정지 모델: 대기 발생 시 감속(→0)+재가속 정지연료 부과 (정지≫대기)
+#   4) 비보호 우회전 허용 (우회전 통과확률 ≈ 1)
+#   base = use_signal False (통과확률=1·정지연료 미인지), signal = 전체 관측.
+#   fuel_TDD(Dijkstra) = 전지적 오라클(전체 정보·결정론 추론) 유지.
+data:
+  topology: data/gangnam_clean_topology.json
+  speed: data/gangnam_clean_speed_data.csv
+experiments:
+  models: {shortest_dijkstra: true, static_fuel_dijkstra: true, rl_base: true, rl_signal: true, rl_signal_attention: true}
+  repeat: 30
+  routes:
+  - {name: t1_seonjeongneung_daechi, start: '341608', goal: '338354', type: long}
+  - {name: t2_yeoksam_hakyeoul,      start: '338267', goal: '338344', type: long}
+  - {name: t3_sinsa_daechi,          start: '341904', goal: '338354', type: long}
+  time_slots:
+  - {label: off_peak, start_hour: 7.0}
+  - {label: peak,     start_hour: 8.0}
+output: {model_dir: models, result_dir: output}
+physics: {accel_ms2: 2.5, ifc_ml_s: 0.5, speed_min_kmh: 5.0, speed_noise: 0.2, v_turn_left_kmh: 30.0, v_turn_right_kmh: 20.0}
+reward:
+  alpha: 1.0
+  arrival_bonus: 700.0
+  penalty_dead: 0.0
+  penalty_timeout: 0.0
+  uturn_penalty: 300.0
+  revisit_penalty: 50.0
+  step_penalty: 6.0          # 배회 억제 (매 스텝 소액 비용)
+train:
+  batch_size: 128
+  checkpoint_every: 2500
+  episodes: 30000
+  epsilon_start: 1.0
+  epsilon_min: 0.05
+  epsilon_decay: 0.99997
+  gamma: 0.97
+  log_interval: 100
+  lr: 0.0005
+  memory_size: 80000
+  multi_route: true
+  target_update: 25
+  warmup_steps: 2000
+  train_max_steps: 300
+  shaping_weight: 1500.0
+  dynamic_od_boost: false
+  penalty_anneal_frac: 0.5
+  penalty_floor: 0.2
+  topologies:
+  - {topology: data/gangnam_clean_topology.json, speed: data/gangnam_clean_speed_data.csv, weight: 1.0, n_random_routes: 30}

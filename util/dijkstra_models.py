@@ -95,7 +95,8 @@ class ShortestDijkstra(_DijkstraBase):
                 if (not u_left_ok and prev_pos is not None
                         and nb != u_prev):
                     if _movement_type(prev_pos, u_pos,
-                                      self.env.nodes[nb]["pos"]) == "left":
+                                      self.env.nodes[nb]["pos"],
+                                      self.env.lon_scale) == "left":
                         continue
                 nd = d + self.env.links[lid]["len"]
                 nb_state = (nb, u)
@@ -167,15 +168,21 @@ class StaticFuelDijkstra(_DijkstraBase):
         cur_pos  = self.env.nodes[src]["pos"]
         to_pos   = self.env.nodes[dst]["pos"]
         prev_pos = self.env.nodes[prev]["pos"] if prev and prev != src else None
-        movement = _movement_type(prev_pos, cur_pos, to_pos)
+        movement = _movement_type(prev_pos, cur_pos, to_pos, self.env.lon_scale)
 
         t_w = self.env._calc_wait(src, abs_sec, movement)
         abs_depart = abs_sec + t_w
 
         v_ms = self._expected_speed_ms(link_id, abs_depart)
-        # 드라이버 운동 모델(2026-05-21 개정)과 정합 — 회전 시 회전속도 진입,
-        # 직진 시 직전 링크 순항속도 이어받음, 진출은 순항속도(노드 감속 없음).
-        if movement == "left":
+        # 드라이버 운동 모델 정합 + 신호 정지 모델(2026-06-11): 대기 발생 시
+        #   감속(→0)+재가속을 반영해 정지(stop-and-go) 연료 부과 (env.step 일치).
+        fuel_stop = 0.0
+        if t_w > 0.0:
+            d_dec = max(1.0, v_entry * v_entry / (2 * 2.5))
+            fuel_stop = (SpeedProfile(v_entry, v_entry, 0.001, d_dec)
+                         .total_fuel() * 1000.0)
+            v_in = 0.001
+        elif movement == "left":
             v_in = min(V_TURN_LEFT, v_ms)
         elif movement == "right":
             v_in = min(V_TURN_RIGHT, v_ms)
@@ -185,7 +192,7 @@ class StaticFuelDijkstra(_DijkstraBase):
         t_tr = prof.total_time()
 
         # VT-Micro 출력 L/s → mL 환산 (env.step과 단위 정합)
-        fuel = prof.total_fuel() * 1000.0 + fuel_idle(t_w) * 1000.0
+        fuel = prof.total_fuel() * 1000.0 + fuel_idle(t_w) * 1000.0 + fuel_stop
         return fuel, t_w + t_tr
 
     def _run(self, src: str, abs_start: float,
@@ -222,7 +229,8 @@ class StaticFuelDijkstra(_DijkstraBase):
                         and nb != u_prev):
                     if _movement_type(self.env.nodes[u_prev]["pos"],
                                       u_node["pos"],
-                                      self.env.nodes[nb]["pos"]) == "left":
+                                      self.env.nodes[nb]["pos"],
+                                      self.env.lon_scale) == "left":
                         continue
                 nf, dt  = self._link_fuel(lid, t, v, src=u, prev=u_prev)
                 total_f = f + nf

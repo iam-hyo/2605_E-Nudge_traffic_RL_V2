@@ -1,0 +1,3 @@
+[pipeline] OUT=/home/hjj/2605_E-Nudge_traffic_RL_V2/output/11_0332_v3
+[train] model_rl_base pid=208678
+[train] model_rl_signal pid=208679

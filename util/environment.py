@@ -34,7 +34,7 @@ from typing import Optional
 
 import numpy as np
 
-from util.fuel_calculate import SpeedProfile, fuel_idle
+from util.fuel_calculate import SpeedProfile, fuel_idle, fc_rate
 from util.reward import RewardCalculator
 
 # ── 전역 상수 ─────────────────────────────────────────────────────────────────
@@ -47,8 +47,17 @@ LINK1_FEAT  = 2         # 1-hop 링크: len + speed
 LINK2_FEAT  = 6         # 2-hop 링크: len + speed + parent_onehot[K_HOP1]
 SIG_FEAT    = 9         # 신호 피처 차원
 
-STATE_SIZE  = 5 + 3 + SIG_FEAT + K_HOP1*NODE_FEAT + K_HOP1*LINK1_FEAT \
-              + N_HOP2*NODE_FEAT + L_HOP2*LINK2_FEAT   # = 229
+# ── v3 경로트리 확률 State (254d) ─────────────────────────────────────────────
+B2_HOP    = 2                       # 2-hop 분기 cap
+B3_HOP    = 2                       # 3-hop 분기 cap
+N2_EDGES  = K_HOP1 * B2_HOP         # 8
+N3_EDGES  = N2_EDGES * B3_HOP       # 16
+GLOB_FEAT = 6                       # 시간3 + 목적지3
+EDGE_FEAT = 8                       # valid,mv_l,mv_r,pass,speed,len,exp_fuel,goal_prog
+EXP_FUEL_NORM = 30.0
+STATE_SIZE = (GLOB_FEAT + K_HOP1*EDGE_FEAT
+              + N2_EDGES*(EDGE_FEAT+1) + N3_EDGES*(EDGE_FEAT+1)
+              + K_HOP1)             # + to_visited(1-hop, 배회 억제) = 258
 
 SPEED_MAX   = 80.0      # km/h — 정규화 기준
 CYCLE_MAX   = 180.0     # s   — 사이클 정규화 기준
@@ -73,7 +82,7 @@ def _phase_category(ph_type: str) -> str:
     return "red"
 
 
-def _movement_type(prev_pos, cur_pos, to_pos) -> str:
+def _movement_type(prev_pos, cur_pos, to_pos, xs: float = 1.0) -> str:
     """
     회전 종류 판정 — 'straight' / 'left' / 'right' / 'uturn'.
 
@@ -88,10 +97,13 @@ def _movement_type(prev_pos, cur_pos, to_pos) -> str:
     if prev_pos is None or cur_pos is None or to_pos is None:
         return "straight"
 
-    dx1 = cur_pos[0] - prev_pos[0]
-    dy1 = cur_pos[1] - prev_pos[1]
-    dx2 = to_pos[0]  - cur_pos[0]
-    dy2 = to_pos[1]  - cur_pos[1]
+    # xs: 경도(x) 축 스케일 보정. 위경도 좌표는 1°경도 < 1°위도 (위도37.5°서 0.8배)라
+    # degree 공간 그대로 외적/내적하면 각도가 ~20% 왜곡 → 회전 오분류. xs=cos(lat) 곱해
+    # 미터 비율로 정렬. 격자(미터 좌표)는 xs=1.0 이라 영향 없음.
+    dx1 = (cur_pos[0] - prev_pos[0]) * xs
+    dy1 =  cur_pos[1] - prev_pos[1]
+    dx2 = (to_pos[0]  - cur_pos[0])  * xs
+    dy2 =  to_pos[1]  - cur_pos[1]
 
     # prev == cur (에피소드 시작 직후): 좌/우 판단 불가 → 직진 처리
     if abs(dx1) + abs(dy1) < 1e-6:
@@ -130,6 +142,8 @@ def _phase_allows(phase_type: str, movement: str) -> bool:
       no_signal    → 전체 통행
     """
     cat = _phase_category(phase_type)
+    if movement == "right":          # 비보호 우회전 — 적신호에도 통과 허용
+        return True
     if cat == "red":
         return False
     if cat == "green":
@@ -226,6 +240,14 @@ class RoadNetworkEnv:
         self.map_w    = self.map_x_max - self.map_x_min or 1.0
         self.map_h    = self.map_y_max - self.map_y_min or 1.0
         self.map_diag = math.hypot(self.map_w, self.map_h) or 1.0
+
+        # 좌표계 판별 + 경도축 보정 스케일.
+        #   geographic(위경도) 이면 1°경도 < 1°위도 → x 축에 cos(lat) 곱해 각도/방향 정렬.
+        #   격자(미터 좌표)면 xs=1.0. 회전판정(_movement_type)·shaping에 사용.
+        mx = (self.map_x_min + self.map_x_max) / 2
+        my = (self.map_y_min + self.map_y_max) / 2
+        self.is_geo  = (124 < mx < 132) and (33 < my < 39)   # 한국 위경도 범위
+        self.lon_scale = math.cos(math.radians(my)) if self.is_geo else 1.0
 
         # ── 속도 DB 로드 ──────────────────────────────────────────────────────
         # {link_id: [t_0, t_1, ..., t_23]}  (km/h)
@@ -407,6 +429,8 @@ class RoadNetworkEnv:
         self.current_time  = 0.0
         self.steps         = 0
         self._last_link_speed_ms = None   # 직진 시 이어받을 직전 링크 순항속도
+        self._last_link_id = None         # 직전 링크 id (도착시각 분산 추정용)
+        self._visited = {self.current_node}   # 방문 노드 (State to_visited, 배회 억제)
         self._goal_center  = self._calc_goal_center()
         return self._get_state()
 
@@ -446,7 +470,7 @@ class RoadNetworkEnv:
                 continue
             if prev_known and not allow_left and nb != self.previous_node:
                 to_pos = self.nodes[nb]["pos"]
-                if _movement_type(prev_pos, cur_pos, to_pos) == "left":
+                if _movement_type(prev_pos, cur_pos, to_pos, self.lon_scale) == "left":
                     continue
             valid.append(nb)
 
@@ -476,7 +500,7 @@ class RoadNetworkEnv:
         prev_pos = (self.nodes[self.previous_node]["pos"]
                     if self.previous_node != self.current_node
                        and self.previous_node in self.nodes else None)
-        movement = _movement_type(prev_pos, cur_pos, to_pos)
+        movement = _movement_type(prev_pos, cur_pos, to_pos, self.lon_scale)
 
         abs_now    = self.start_time_sec + self.current_time
         t_wait     = self._calc_wait(self.current_node, abs_now, movement)
@@ -490,35 +514,46 @@ class RoadNetworkEnv:
         #   · 좌/우회전 → 회전 감속 유지 (회전 속도로 진입 후 가속)
         #   · 직진      → 노드에서의 명시적 감속 없음. 직전 링크 순항속도를
         #                 이어받아 링크 간 속도 차이만큼만 가·감속.
-        if movement == "left":
+        # 신호 정지 모델 (2026-06-11): 대기(t_wait>0)가 발생하면 실제 정지 →
+        #   감속(직전 순항→0) + 공회전 + 재가속(0→순항). 정지(stop-and-go)가
+        #   연료의 지배 요인이라는 분석을 dynamics에 직접 반영.
+        v_prev  = (self._last_link_speed_ms
+                   if self._last_link_speed_ms is not None else v_ms)
+        stopped = (t_wait > 0.0)
+        fuel_stop = 0.0
+        if stopped:
+            d_dec = max(1.0, v_prev * v_prev / (2 * ACCEL_MS2))
+            fuel_stop = (SpeedProfile(v_prev, v_prev, 0.001, d_dec)
+                         .total_fuel() * 1000.0)   # 감속(→0) 연료
+            v_entry = 0.001                          # 정지 후 재가속 (링크 내 포함)
+        elif movement == "left":
             v_entry = min(V_TURN_LEFT, v_ms)
         elif movement == "right":
             v_entry = min(V_TURN_RIGHT, v_ms)
         else:                                   # straight / uturn / 에피소드 시작
-            v_entry = (self._last_link_speed_ms
-                       if self._last_link_speed_ms is not None else v_ms)
+            v_entry = v_prev
 
-        # 진출 속도 — 다음 회전은 미지이므로 명시적 노드 감속 없이 순항속도를
-        # 유지한다. 다음 회전의 감속은 다음 링크의 v_entry 로 반영된다.
         profile  = SpeedProfile(
             v_cruise = v_ms,
             v_entry  = v_entry,
             v_exit   = v_ms,
             link_len = lk["len"],
         )
-        self._last_link_speed_ms = v_ms          # 다음 직진 링크가 이어받을 속도
+        self._last_link_speed_ms = v_ms
+        self._last_link_id       = link_id
         t_travel = profile.total_time()
 
-        # 연료 — VT-Micro 출력 L/s → mL 환산 (보상 스케일 정합)
+        # 연료 — VT-Micro 출력 L/s → mL (보상 스케일 정합)
         fuel_drive = profile.total_fuel() * 1000.0
         fuel_wait  = fuel_idle(t_wait)    * 1000.0
-        fuel_total = fuel_drive + fuel_wait
+        fuel_total = fuel_drive + fuel_wait + fuel_stop
 
         # ── 3. 상태 전이 ─────────────────────────────────────────────────────
         self.current_time  += t_wait + t_travel
         self.previous_node  = self.current_node
         self.current_node   = action
         self.steps         += 1
+        self._visited.add(action)
 
         reached  = self.current_node in self.goal_nodes
         timeout  = self.steps >= self.max_steps
@@ -544,153 +579,174 @@ class RoadNetworkEnv:
         }
         return self._get_state(), reward, done, info
 
-    # ── State 벡터 ────────────────────────────────────────────────────────────
+    # ── v3 확률 State 헬퍼 ────────────────────────────────────────────────────
+    def _mean_speed_ms(self, lid: str, abs_sec: float) -> float:
+        """노이즈 없는 평균 속도(m/s). State는 평균만 관측(POMDP)."""
+        slot = self._time_slot(abs_sec)
+        base = self.speed_db.get(lid, [35.0] * 24)[slot]
+        return max(SPEED_MIN, base) / 3.6
+
+    def _goal_d(self, pos) -> float:
+        gx, gy = self._goal_center
+        return math.hypot((gx - pos[0]) * self.lon_scale, gy - pos[1])
+
+    # 3-point 가우시안 구적 (속도 최적화: state 생성당 _calc_wait 호출 최소화)
+    _GQ3 = ((-1.0, 0.242), (0.0, 0.399), (1.0, 0.242))
+
+    def _signal_stats(self, node: str, mu: float, sigma: float,
+                      movement: str) -> tuple:
+        """도착시각 ~ N(mu, sigma) 일 때 (통과확률, 기대대기초).
+        use_signal=False(base) 또는 비보호 우회전 → (1.0, 0.0)."""
+        if not self.use_signal or movement == "right":
+            return 1.0, 0.0
+        if self.nodes[node].get("signal") is None:
+            return 1.0, 0.0
+        sigma = max(sigma, 0.5)
+        wsum = 0.0; p = 0.0; ew = 0.0
+        for z, w in self._GQ3:
+            wt = self._calc_wait(node, mu + z * sigma, movement)
+            if wt == 0.0:
+                p += w
+            ew += w * wt; wsum += w
+        return p / wsum, ew / wsum
+
+    def _edge_exp_fuel(self, lid: str, v_ms: float, pass_prob: float) -> float:
+        """이 링크 1개의 예상 연료(mL): 주행 + (1-pass)×정지비용."""
+        lk = self.links[lid]
+        drive = fc_rate(v_ms, 0.0) * 1000.0 * (lk["len"] / max(v_ms, 0.5))
+        if not self.use_signal:
+            return drive
+        stop = 0.143 * v_ms * v_ms               # 정지(감속+재가속) 근사 mL
+        return drive + (1.0 - pass_prob) * stop
+
+    def _forward_edges(self, node: str, came_from):
+        """node 에서 came_from 으로 되돌아가지 않는 전방 엣지(좌회전금지 반영).
+        목표 접근도 내림차순 정렬 후 반환 [(nb, lid)]."""
+        nbs = self.adj.get(node, [])
+        is_dead = (len(nbs) <= 1)
+        npos = self.nodes[node]["pos"]
+        cpos = (self.nodes[came_from]["pos"]
+                if came_from and came_from in self.nodes and came_from != node
+                else None)
+        left_ok = _node_allows_left(self.nodes[node])
+        out = []
+        for nb, lid in nbs:
+            if nb == came_from and not is_dead:
+                continue
+            if (not left_ok) and cpos is not None and nb != came_from:
+                if _movement_type(cpos, npos, self.nodes[nb]["pos"],
+                                  self.lon_scale) == "left":
+                    continue
+            out.append((nb, lid))
+        gd_node = self._goal_d(npos)
+        out.sort(key=lambda e: -(gd_node - self._goal_d(self.nodes[e[0]]["pos"])))
+        return out
+
+    def _edge_feat(self, src, dst, lid, prev, mu, var):
+        """엣지(src→dst) 의 8-피처 + 도착분포 전이. 반환 (feat8, mu_dst, var_dst)."""
+        spos = self.nodes[src]["pos"]; dpos = self.nodes[dst]["pos"]
+        ppos = (self.nodes[prev]["pos"]
+                if prev and prev != src and prev in self.nodes else None)
+        mv   = _movement_type(ppos, spos, dpos, self.lon_scale)
+        v_ms = self._mean_speed_ms(lid, mu)
+        pp, ewait = self._signal_stats(src, mu, math.sqrt(max(var, 0.0)), mv)
+        ln   = self.links[lid]["len"]
+        ef   = self._edge_exp_fuel(lid, v_ms, pp)
+        gp   = max(-1.0, min(1.0, (self._goal_d(spos) - self._goal_d(dpos))
+                             / max(ln, 1.0)))
+        feat = [
+            1.0,
+            1.0 if mv == "left"  else 0.0,
+            1.0 if mv == "right" else 0.0,
+            pp,
+            (v_ms * 3.6) / SPEED_MAX,
+            ln / self.max_link_len,
+            min(ef / EXP_FUEL_NORM, 2.0),
+            gp,
+        ]
+        tt    = ln / max(v_ms, 0.5)
+        return feat, mu + ewait + tt, var + (0.20 * tt) ** 2
+
+    # ── State 벡터 (254d 경로트리 확률) ──────────────────────────────────────
     def _get_state(self) -> np.ndarray:
-        cur   = self.current_node
-        prev  = self.previous_node
+        cur  = self.current_node
+        prev = self.previous_node
         abs_t = self.start_time_sec + self.current_time
-
-        # 같은 State 생성 안에서는 동일 (link_id, slot) 조합당 단일 속도 샘플 사용
-        # → 1-hop 속도 / 2-hop ETA 계산이 일관성 있게 유지
-        speed_cache: dict[tuple, float] = {}
-
-        def cached_speed(lid: str, at_sec: float) -> float:
-            slot = self._time_slot(at_sec)
-            key  = (lid, slot)
-            if key not in speed_cache:
-                speed_cache[key] = self._get_link_speed_ms(lid, at_sec)
-            return speed_cache[key]
-
         cx, cy = self.nodes[cur]["pos"]
         gx, gy = self._goal_center
 
-        # ── A. 위치 (5d) ─────────────────────────────────────────────────────
-        s_pos = [
-            (cx - self.map_x_min) / self.map_w,
-            (cy - self.map_y_min) / self.map_h,
-            (gx - cx) / self.map_w,
-            (gy - cy) / self.map_h,
-            math.hypot(gx - cx, gy - cy) / self.map_diag,
-        ]
-
-        # ── B. 시간 (3d) ─────────────────────────────────────────────────────
+        # 전역 (6)
         t_ratio = abs_t / 86400.0
-        s_time = [
+        ddx = (gx - cx) * self.lon_scale; ddy = gy - cy
+        dd  = math.hypot(ddx, ddy) or 1.0
+        glob = [
             math.sin(2 * math.pi * t_ratio),
             math.cos(2 * math.pi * t_ratio),
             min(self.current_time / 7200.0, 1.0),
+            ddx / dd, ddy / dd,
+            min(dd * 111.0 / 10.0, 1.0),
         ]
 
-        # ── C. 현재 신호 (9d) ────────────────────────────────────────────────
-        s_sig_cur = self._signal_features(cur, abs_t)
+        # 현재 노드 도착분포 분산 — 직전 링크에서 누적
+        var0 = 0.0
+        if self._last_link_id is not None and self._last_link_id in self.links:
+            ln0 = self.links[self._last_link_id]["len"]
+            v0  = self._mean_speed_ms(self._last_link_id, abs_t)
+            var0 = (0.20 * ln0 / max(v0, 0.5)) ** 2
 
-        # ── D, E. 1-hop 노드 + 진입 링크 ─────────────────────────────────────
-        neighbors = self.get_valid_actions()[:K_HOP1]
-        hop1_nodes_block: list[list[float]] = []
-        hop1_links_block: list[list[float]] = []
+        # 1-hop
+        slots1 = self.get_valid_actions()[:K_HOP1]
+        e1 = [None] * K_HOP1
+        for k, M in enumerate(slots1):
+            lid = next((l for nb, l in self.adj[cur] if nb == M), None)
+            if lid is None:
+                continue
+            feat, mu_M, var_M = self._edge_feat(cur, M, lid, prev, abs_t, var0)
+            e1[k] = (feat, mu_M, var_M, M)
 
-        # 부모 1-hop k → (1-hop_id, eta1)  : 2-hop에서 ETA 추정에 사용
-        parent_info: dict[int, tuple[str, float]] = {}
+        # 2-hop (parent k = idx // B2)
+        e2 = [None] * N2_EDGES
+        for k in range(K_HOP1):
+            if e1[k] is None:
+                continue
+            _, mu_M, var_M, M = e1[k]
+            for j, (P, lidP) in enumerate(self._forward_edges(M, cur)[:B2_HOP]):
+                feat, mu_P, var_P = self._edge_feat(M, P, lidP, cur, mu_M, var_M)
+                e2[k * B2_HOP + j] = (feat, mu_P, var_P, P, M)
 
-        for k, nb_id in enumerate(neighbors):
-            link_id = next((lid for nb, lid in self.adj[cur] if nb == nb_id), None)
-            lk      = self.links[link_id]
-            v_ms    = cached_speed(link_id, abs_t)
-            eta     = lk["len"] / max(v_ms, 0.1)
+        # 3-hop (parent 2-slot = idx // B3)
+        e3 = [None] * N3_EDGES
+        for s in range(N2_EDGES):
+            if e2[s] is None:
+                continue
+            _, mu_P, var_P, P, M = e2[s]
+            for i, (Q, lidQ) in enumerate(self._forward_edges(P, M)[:B3_HOP]):
+                feat, _, _ = self._edge_feat(P, Q, lidQ, M, mu_P, var_P)
+                e3[s * B3_HOP + i] = (feat,)
 
-            nbx, nby = self.nodes[nb_id]["pos"]
-            sn       = self._signal_features(nb_id, abs_t + eta)
+        ZERO = [0.0] * EDGE_FEAT
+        f1 = [e[0] if e else ZERO for e in e1]
+        f2 = [e[0] if e else ZERO for e in e2]
+        f3 = [e[0] if e else ZERO for e in e3]
+        par2 = [((idx // B2_HOP) / (K_HOP1 - 1)) if e2[idx] else 0.0
+                for idx in range(N2_EDGES)]
+        par3 = [((idx // B3_HOP) / (N2_EDGES - 1)) if e3[idx] else 0.0
+                for idx in range(N3_EDGES)]
 
-            hop1_nodes_block.append([
-                (nbx - self.map_x_min) / self.map_w,
-                (nby - self.map_y_min) / self.map_h,
-                *sn,
-            ])
-            hop1_links_block.append([
-                lk["len"] / self.max_link_len,
-                (v_ms * 3.6) / SPEED_MAX,
-            ])
-            parent_info[k] = (nb_id, eta)
+        state = list(glob)
+        for fi in range(EDGE_FEAT):
+            state += [f1[k][fi] for k in range(K_HOP1)]
+        for fi in range(EDGE_FEAT):
+            state += [f2[s][fi] for s in range(N2_EDGES)]
+        state += par2
+        for fi in range(EDGE_FEAT):
+            state += [f3[t][fi] for t in range(N3_EDGES)]
+        state += par3
 
-        # 패딩 (pos = -1 sentinel: 실제 노드는 pos ∈ [0,1])
-        while len(hop1_nodes_block) < K_HOP1:
-            hop1_nodes_block.append([-1.0, -1.0] + [0.0] * SIG_FEAT)
-            hop1_links_block.append([0.0] * LINK1_FEAT)
+        # to_visited (1-hop): 이 엣지의 도착 노드를 이미 방문했는가 (배회 억제)
+        vis = getattr(self, "_visited", set())
+        state += [1.0 if (e1[k] and e1[k][3] in vis) else 0.0
+                  for k in range(K_HOP1)]
 
-        s_hop1_nodes = [v for row in hop1_nodes_block for v in row]
-        s_hop1_links = [v for row in hop1_links_block for v in row]
-
-        # ── F, G. 2-hop 노드 + 링크 (BFS round-robin) ────────────────────────
-        # 부모별 후보를 모은 후 round-robin 으로 추출 → DFS 편향 제거
-        candidates_by_parent: list[list[tuple[str, str]]] = [[] for _ in range(K_HOP1)]
-        for k, (nb_id, _eta) in parent_info.items():
-            for nb2_id, lid_out in sorted(self.adj.get(nb_id, [])):
-                if nb2_id == cur or nb2_id == prev or nb2_id == nb_id:
-                    continue
-                candidates_by_parent[k].append((nb2_id, lid_out))
-
-        hop2_nodes_list: list[tuple[str, float]] = []      # (node_id, eta_at_node)
-        hop2_links_list: list[tuple[int, str, str]] = []   # (parent_k, lid_out, nb2_id)
-        seen_nodes: set[str] = set()
-
-        max_rounds = max((len(c) for c in candidates_by_parent), default=0)
-        for round_idx in range(max_rounds):
-            for k in range(K_HOP1):
-                if round_idx >= len(candidates_by_parent[k]):
-                    continue
-                nb2_id, lid_out = candidates_by_parent[k][round_idx]
-                _, eta1 = parent_info[k]
-
-                # 모든 경로(링크)는 별개 — 중복 허용
-                if len(hop2_links_list) < L_HOP2:
-                    hop2_links_list.append((k, lid_out, nb2_id))
-
-                # 노드는 dedup
-                if nb2_id not in seen_nodes and len(hop2_nodes_list) < N_HOP2:
-                    seen_nodes.add(nb2_id)
-                    v_out = cached_speed(lid_out, abs_t + eta1)
-                    eta2  = eta1 + self.links[lid_out]["len"] / max(v_out, 0.1)
-                    hop2_nodes_list.append((nb2_id, eta2))
-
-                if (len(hop2_links_list) >= L_HOP2
-                        and len(hop2_nodes_list) >= N_HOP2):
-                    break
-            if (len(hop2_links_list) >= L_HOP2
-                    and len(hop2_nodes_list) >= N_HOP2):
-                break
-
-        # 2-hop 노드 블록
-        hop2_nodes_block: list[list[float]] = []
-        for nb2_id, eta2 in hop2_nodes_list:
-            nbx, nby = self.nodes[nb2_id]["pos"]
-            sn2      = self._signal_features(nb2_id, abs_t + eta2)
-            hop2_nodes_block.append([
-                (nbx - self.map_x_min) / self.map_w,
-                (nby - self.map_y_min) / self.map_h,
-                *sn2,
-            ])
-        while len(hop2_nodes_block) < N_HOP2:
-            hop2_nodes_block.append([-1.0, -1.0] + [0.0] * SIG_FEAT)
-        s_hop2_nodes = [v for row in hop2_nodes_block for v in row]
-
-        # 2-hop 링크 블록
-        hop2_links_block: list[list[float]] = []
-        for parent_k, lid_out, _nb2_id in hop2_links_list:
-            _, eta1 = parent_info[parent_k]
-            v_out   = cached_speed(lid_out, abs_t + eta1)
-            parent_oh = [0.0] * K_HOP1
-            parent_oh[parent_k] = 1.0
-            hop2_links_block.append([
-                self.links[lid_out]["len"] / self.max_link_len,
-                (v_out * 3.6) / SPEED_MAX,
-                *parent_oh,
-            ])
-        while len(hop2_links_block) < L_HOP2:
-            hop2_links_block.append([0.0] * LINK2_FEAT)
-        s_hop2_links = [v for row in hop2_links_block for v in row]
-
-        state = (s_pos + s_time + s_sig_cur
-                 + s_hop1_nodes + s_hop1_links
-                 + s_hop2_nodes + s_hop2_links)
-        assert len(state) == STATE_SIZE, f"State dim error: {len(state)} != {STATE_SIZE}"
+        assert len(state) == STATE_SIZE, f"State dim {len(state)} != {STATE_SIZE}"
         return np.array(state, dtype=np.float32)

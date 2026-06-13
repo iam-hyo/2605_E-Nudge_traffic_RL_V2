@@ -1,0 +1,32 @@
+  실험 범위: route=['od2_yangjae_yeongdong'] time_slot=['peak'] repeat=30
+
+──────────────────────────────────────────────────
+ 모델: shortest_dijkstra
+  od2_yangjae_yeongdong | peak | reach=30/30 | 진행 30/120 | ETA 34s
+
+──────────────────────────────────────────────────
+ 모델: static_fuel_dijkstra
+  od2_yangjae_yeongdong | peak | reach=30/30 | 진행 60/120 | ETA 481s
+  [로드] models/model_rl_base.pth
+
+──────────────────────────────────────────────────
+ 모델: rl_base
+  od2_yangjae_yeongdong | peak | reach=30/30 | 진행 90/120 | ETA 197s
+  [로드] models/model_rl_signal.pth
+
+──────────────────────────────────────────────────
+ 모델: rl_signal
+  od2_yangjae_yeongdong | peak | reach=30/30 | 진행 120/120 | ETA 0s
+[SKIP] rl_signal_attention
+
+==================================================
+ 실험 완료 → output/11_2335
+ 전체 실행 수: 120
+ 소요 시간: 700.7s
+
+모델                         경로         시간대        연료mL           시간s        대기s      스텝    도달    좌/직/우
+─────────────────────────────────────────────────────────────────────────────────────────────────────
+shortest_dijkstra          od2_yangjae_yeongdong peak        1026.6±26.1   1606.7  610.4  60.0  100%  7/48/5
+static_fuel_dijkstra       od2_yangjae_yeongdong peak         911.9±45.8   1253.7  139.9  68.7  100%  9/48/12
+rl_base                    od2_yangjae_yeongdong peak        1085.7±181.0  1597.1  431.2  75.9  100%  11/53/12
+rl_signal                  od2_yangjae_yeongdong peak        1099.3±142.1  1651.0  488.2  70.4  100%  11/48/11

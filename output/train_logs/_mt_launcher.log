@@ -1,0 +1,7 @@
+[launch] model_rl_base  pid=2428794  ep_override=None
+[launch] model_rl_signal  pid=2428795  ep_override=None
+[launch] model_rl_signal_attention  pid=2428796  ep_override=25000
+[done]   model_rl_base  rc=0  t=5587s
+[done]   model_rl_signal  rc=0  t=7101s
+[done]   model_rl_signal_attention  rc=0  t=7704s
+[ALL DONE] 7704s

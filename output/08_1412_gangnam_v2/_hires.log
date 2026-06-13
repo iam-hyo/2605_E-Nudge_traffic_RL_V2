@@ -1,0 +1,32 @@
+
+[od1_sinnonhyeon_suseo] 342695 → 613667
+  shortest path len=81 ; fuelTDD path len=64
+  saved → output/08_1412_gangnam_v2/gn_od1_sinnonhyeon_suseo_fullmap.png
+  saved → output/08_1412_gangnam_v2/gn_od1_sinnonhyeon_suseo_zoom3.png
+  [camera GIF] od1_sinnonhyeon_suseo …
+  [camera] frame 0/528
+  [camera] frame 40/528
+  [camera] frame 80/528
+  [camera] frame 120/528
+  [camera] frame 160/528
+  [camera] frame 200/528
+  [camera] frame 240/528
+  [camera] frame 280/528
+  [camera] frame 320/528
+  [camera] frame 360/528
+  [camera] frame 400/528
+  [camera] frame 440/528
+  [camera] frame 480/528
+  [camera] frame 520/528
+  [camera] saved → output/08_1412_gangnam_v2/gn_od1_sinnonhyeon_suseo_camera.gif  (528 frames)
+
+[od2_yangjae_yeongdong] 338734 → 342812
+  shortest path len=61 ; fuelTDD path len=71
+  saved → output/08_1412_gangnam_v2/gn_od2_yangjae_yeongdong_fullmap.png
+  saved → output/08_1412_gangnam_v2/gn_od2_yangjae_yeongdong_zoom3.png
+
+[od3_segok_samsung] 340301 → 341509
+  shortest path len=64 ; fuelTDD path len=63
+  saved → output/08_1412_gangnam_v2/gn_od3_segok_samsung_fullmap.png
+  saved → output/08_1412_gangnam_v2/gn_od3_segok_samsung_zoom3.png
+  saved → output/08_1412_gangnam_v2/gn_pixel_compare.png

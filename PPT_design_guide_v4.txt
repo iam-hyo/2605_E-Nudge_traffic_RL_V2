@@ -1,0 +1,410 @@
+PPT DESIGN GUIDE — v4 (General-Purpose)
+================================================================================
+A reusable system for generating clean, confident 16:9 presentation decks.
+This is a GENERAL design guide, not tied to any single brand, aesthetic, or
+deck genre (portfolio, pitch, report, lecture, case study all qualify).
+
+It supersedes v3 ("Apple-localized" overview). v3 was a single-aesthetic,
+portfolio-oriented spec; v4 keeps the parts that generalize (anchor system,
+spacing tiers, density limits, the four-section content template) and removes
+the parts that were brand- or genre-locked (Apple mimicry, mandatory dark/light
+alternation, a fixed single font, resume/closing-only components).
+
+--------------------------------------------------------------------------------
+DESIGN PHILOSOPHY
+--------------------------------------------------------------------------------
+Every slide is one edge-to-edge 16:9 frame built around a single clear message.
+Nothing competes with that message: typography is confident but quiet, color is
+restrained, and decoration is near-absent. Structure and whitespace carry the
+design — not borders, gradients, or shadows. A reader should grasp each slide's
+point in a few seconds and always know where to look next.
+
+Three durable principles (genre-independent):
+  1. One message per slide. If a slide has two ideas, it is two slides.
+  2. Hierarchy through space and weight, not through chrome.
+  3. Consistency is the spine. Repeating elements live at identical coordinates
+     on every slide so the eye can rely on them.
+
+--------------------------------------------------------------------------------
+CANVAS & COORDINATES
+--------------------------------------------------------------------------------
+Output is 16:9 ONLY. No portrait, 4:3, or square.
+
+Two first-class canvas sizes (identical proportional layout; only absolute
+values differ):
+  - Standard: 13.333" x 7.5"  (the widescreen PowerPoint default; primary target)
+  - Pixel reference: 1280 x 720 px, or 1920 x 1080 px for high-density export.
+
+All pixel coordinates below are given on the 1280 x 720 reference. To scale:
+  - 1280 -> 1920 px: multiply X/Y/W/H by 1.5
+  - px -> inches: divide by 96 (so 1280 px = 13.333")
+  - px -> EMU: multiply by 9525
+When authoring with an inch-based library (e.g. pptxgenjs LAYOUT_WIDE), treat
+the 13.333" x 7.5" frame as the canvas and convert the px anchors below by /96.
+
+Internal margins (1280 reference):
+  - Left / right margin: 38 px (~0.4")
+  - Top margin: 18 px
+  - Bottom margin / footer baseline: 38 px (footer text at y ~690)
+
+--------------------------------------------------------------------------------
+SLIDE ANCHOR SYSTEM (the spine)
+--------------------------------------------------------------------------------
+Every content slide uses these fixed anchors. They never move between slides —
+that invariance is what makes a deck feel engineered rather than assembled.
+
+Element                Position (x, y)   Size               Notes
+------------------------------------------------------------------------------
+Slide title            (30, 18)          ~50 px tall        Title marker + bold title (see Header Block).
+Message bar            (38, 80)          1200 x ~40         Optional accent bar at left + one-line summary.
+Meta row               (38, 126)         1200 x 22          Supporting metadata (date / source / context), one line.
+Body region            y: 156 -> 678     width 1204         Where the substance lives (cards, images, sections).
+Footer (left)          (38, 690)         600 x 14           Section/deck label, muted, ~9 pt.
+Footer (right/page #)   (1100, 690)       150 x 14           Page number, muted, ~9 pt, right-aligned.
+
+The header region (y: 0 -> 150) is reserved. Title, message bar, and meta row
+keep their coordinates and never compete with body content. The body region
+(y: 156 -> 678) is where density is allowed.
+
+Header-region spacing (apply the tier system below):
+  - Title -> message bar:        ~20-30 px (Tier 2)
+  - Message bar -> meta row:      ~16 px    (Tier 1)
+  - Meta row -> body start:       ~30 px    (Tier 3)
+  - Body region -> footer:        ~12 px    (Tier 2)
+
+Anchor exceptions:
+  - Cover slide: title may be centered or laid out asymmetrically.
+  - Section-divider slide (optional): large centered title.
+  - Closing slide: usually mirrors the cover; anchor system optional.
+
+--------------------------------------------------------------------------------
+COLOR SYSTEM
+--------------------------------------------------------------------------------
+The system is built on ONE neutral surface family, ONE primary accent, and an
+optional ONE secondary accent for rare "conclusion/warning" emphasis. Do not
+introduce a third accent.
+
+Pick a surface mode per deck and keep it consistent:
+  - Light mode (recommended default): light/parchment canvases throughout. Reads
+    as trustworthy and neutral; the safe choice for most decks (reports,
+    portfolios, internal docs). Use a dark color only for small emphasis blocks
+    (side panels, table label columns, a closing bar).
+  - Dark mode: near-black canvases throughout, light text. Reserve for
+    high-drama product/keynote decks. If used, swap tokens consistently
+    (ink -> light text, hairline -> translucent white).
+  - Alternating mode (advanced): light <-> dark surface change marks chapter
+    boundaries. Powerful but easy to overuse; only for long narrative decks.
+    NOT a default — most decks should pick one mode and stay there.
+
+Token roles (assign any hex that satisfies the role + contrast; examples are
+one valid palette, not a mandate):
+  Surface / canvas        primary background            e.g. #FFFFFF
+  Surface / parchment     subtle alt background, cards  e.g. #F5F5F7
+  Surface / card-fill     callout & data cards          e.g. #F5F8FC
+  Surface / dark          emphasis panels, dark slides  e.g. #1B2A4A
+  Surface / accent-fill   quiet category cue (table     e.g. #EAF1FC
+                          headers, highlighted rows)
+  Accent / primary        the single brand accent: all  e.g. #2D6CDF
+                          highlights, number badges,
+                          link/CTA, KPI emphasis
+  Accent / secondary      rare conclusion/warning only  e.g. #E23B3B
+  Text / ink              headlines & body on light     e.g. #1F2937
+  Text / on-dark          text on dark surfaces         e.g. #FFFFFF
+  Text / muted            captions, footers, metadata   e.g. #5B6472
+  Text / faint            disabled, hairline-on-text    e.g. #9CA3AF
+  Line / hairline         1px borders, section rules    e.g. #E2E7EF
+
+Color rules:
+  - Exactly one primary accent. It carries every accent moment.
+  - The secondary accent (if used at all) appears only on genuine
+    conclusion/result/warning markers — never as general decoration.
+  - Accent-fill is a category cue (e.g. a table header band), not emphasis.
+  - No decorative gradients. Atmosphere comes from imagery and surface, not CSS.
+  - On dark surfaces, brighten the accent so it does not disappear.
+
+--------------------------------------------------------------------------------
+TYPOGRAPHY
+--------------------------------------------------------------------------------
+Font: choose ONE family for the whole deck and use it everywhere (one
+typographic voice). Prefer a family with native Korean + Latin coverage so both
+scripts render at the same size in the same line.
+  - Preferred when available: Pretendard (full weight set 300-700).
+  - Reliable fallback (when the preferred font is not installed in the build
+    environment): Calibri, or another clean humanist/geometric sans with Korean
+    coverage. Do not mix two visible fonts in one deck.
+
+THE BODY-FLOOR RULE (genre-tunable):
+  - Body prose floor: 12 pt for dense decks (reports, lecture notes, data-heavy
+    slides). RAISE to 14 pt for low-density, read-at-a-distance decks
+    (portfolios, pitch decks, anything shown on a projector or reviewed across a
+    table). When unsure, 14 pt is the safer presentation default.
+  - Metadata / dates: one step below body (e.g. 12 pt when body is 14 pt).
+  - Captions / labels / footnotes: 10 pt.
+  - Absolute floor for ALL text: 9 pt. Nothing renders below 9 pt.
+
+Hierarchy (sizes are for the 1280 reference at a 14 pt body default; scale 1.5x
+for 1920; nudge down one step for a dense 12 pt deck):
+  Role                Size    Weight   Line-Height   Use
+  hero-display        40 pt   600      1.07          Cover title
+  title-block         24-28pt 700      1.10          Fixed slide title
+  section-head        14-18pt 600-700  1.10-1.20     In-body section name / sub-head
+  message-bar         13-14pt 400/700  1.35          One-line slide summary (bold key phrases)
+  body                14 pt   400      1.4-1.5        Default body prose (most-used)
+  body-mid            14 pt   500      1.4-1.5        Mid-emphasis where 400 is weak, 600 too loud
+  body-strong         14 pt   600      1.4-1.5        Inline strong emphasis, item titles
+  meta                12 pt   400/700  1.30          Metadata row (date bold, rest muted)
+  caption             10 pt   400      1.30-1.40     Captions, placeholder labels, parenthetical hints
+  label-allcaps       10 pt   700      1.30 (+track) All-caps labels ("OVERVIEW", "CORE COMPETENCY")
+  kpi-number          22-26pt 700      1.10          Large KPI numbers
+  fine-print          9 pt    400      1.30          Footer, page numbers, citations
+
+Typographic principles:
+  - Slightly negative letter-spacing at display sizes (>= ~14 pt) for a tight,
+    deliberate cadence; keep body tracking near-neutral.
+  - Korean and Latin coexist in one line at one size — rely on the chosen
+    font's proportional metrics; don't hand-kern.
+  - Korean body line-height stays >= 1.4 for legibility; tighten to 1.4 only for
+    short 1-2 line blocks.
+  - Weight 500 for mid-emphasis, 600 for section heads/card titles, 700 for slide
+    titles, KPI numbers, and rare assertive key terms inside prose.
+  - Section header text stays in ink; signal the section with a small
+    primary-accent number badge, not by coloring the whole header.
+
+--------------------------------------------------------------------------------
+LAYOUT & SPACING
+--------------------------------------------------------------------------------
+Base unit: 4 px. Structural snaps: 8 / 12 / 16 / 20 / 24 / 40 / 60 / 80.
+Card padding: ~16 px (1280) / ~24 px (1920). Body inner gutter: 18-24 px.
+
+GROUP-VS-GROUP SPACING (the most important rule):
+The gap between two elements must signal their relationship. Use tiers:
+  Tier 1 — Intra-group (label + its value):            6-12 px
+  Tier 2 — Inter-group within a section (related):     14-22 px
+  Tier 3 — Section to section (different concepts):    28-44 px
+  Tier 4 — Hero / page-level breathing room:           60-80 px
+When in doubt, increase to the next tier. Cramped slides feel anxious;
+generous section boundaries feel confident.
+
+Common body column patterns (1280 widths, usable width 1204):
+  - Asymmetric 38/62 (460 / 722): visual left + structured content right.
+  - 2-column (598 / 598):          text + visual, or comparison.
+  - 3-column (393 each):           three cards or a three-step process.
+  - 4-column (288 each):           KPI strip, four-step process.
+  - 5/6-column (228 / 190 each):   concept or icon rows, dense data.
+  - Asymmetric 70/30 (842 / 350):  text-heavy side + small chart/thumbnail.
+
+Whitespace: the header region carries generous air; the body region is denser
+but disciplined. A body region cramped with Tier-1 gaps between Tier-3 groups is
+a failed slide — so is a body region padded with filler. If a region is too
+empty, replace prose with a visual rather than stretching text.
+
+--------------------------------------------------------------------------------
+SHAPE, ELEVATION & IMAGERY
+--------------------------------------------------------------------------------
+Border radius scale:
+  0 px    full-bleed backgrounds, section-rule underlines
+  4-6 px  pill chips, image inner radius, table corners
+  8 px    KPI / secondary cards
+  12 px   callout cards, image containers, emphasis blocks
+  pill    pill CTAs and accent bars
+  50%     circular icon glyphs and section number badges (~22 px)
+
+Elevation:
+  - Flat: full-bleed backgrounds and the header region (no border, no shadow).
+  - Hairline: a 1 px hairline ring on cards, data cells, and as the rule under
+    section headers. This is the default "edge."
+  - Image shadow: ONE soft drop shadow (≈ rgba(0,0,0,0.22), 3px 5px 30px on
+    1280; 4px 7px 45px on 1920) applied ONLY to photographic imagery resting on
+    a surface — never to cards, buttons, or text.
+Elevation otherwise comes from surface-color change and the hairline ring, not
+from shadow.
+
+Imagery:
+  - Hero imagery (cover/divider): full-bleed background.
+  - Inline imagery: rests in a defined container (e.g. ~460x340 on a project
+    page) with a 12 px container radius and a smaller image radius.
+  - Maintain 16:9, 4:3, or 1:1 crops — never freeform.
+  - When the image is a to-be-supplied placeholder, render an explicit
+    placeholder (icon glyph + all-caps "IMAGE PLACEHOLDER" label + a one-line
+    guidance caption) rather than an empty rectangle.
+
+--------------------------------------------------------------------------------
+COMPONENTS
+--------------------------------------------------------------------------------
+
+HEADER BLOCK (every content slide) — the spine, three stacked elements:
+  1. Slide title at (30,18): an optional title marker (a bold pipe "|" or short
+     bar in the primary accent) + the title in ink at title-block size. The
+     marker, if used, must be used on EVERY slide for continuity.
+  2. Message bar at (38,80): a one-line summary; optionally preceded by a small
+     primary-accent bar at the left edge. Bold 2-3 key phrases; keep connectives
+     regular. Exactly one line.
+  3. Meta row at (38,126): supporting metadata, segments separated by " · ".
+     One line; if it overflows, drop the least essential segment.
+
+SECTION HEADER (inside body):
+  - Number badge: ~22 px circle at the section's left edge (x = column left),
+    primary-accent fill, white number (11 pt/700) centered.
+  - Section title: 13-14 pt/700 ink, baseline-aligned to the badge center,
+    ~30 px right of the badge (x = badge_x + 30).
+  - Optional section rule: 1 px hairline, full section width, ~26 px below the
+    badge top edge.
+  - Tier-1 gap (6 px) between rule and body start; body starts ~34 px below the
+    section-start y.
+
+FOUR-SECTION CONTENT TEMPLATE (the dominant body layout):
+  A two-column body region that generalizes well beyond portfolios — use it for
+  any "explain one item in depth" slide (a project, a product, a case, a
+  method).
+  Coordinates (1280 reference):
+    - Left column (visual): x = 38, width 460. Image/chart container at
+      (38, 156), 460 x 340; optional caption block below at (38, 514), 460 wide.
+    - Right column (four sections): x = 520, width 722. Each section ~117 px tall
+      (28 px header + ~89 px body) with an 18 px gap, so section starts step by
+      +135 px: section 1 at y = 156, section 2 at y = 291, section 3 at y = 426,
+      section 4 at y = 561. Section rule sits ~26 px below each start; body ~34 px
+      below each start.
+  Left column: a visual (image or chart). Right column: four stacked sections
+  following a Context -> Action -> Result -> Takeaway rhythm. Typical labels by
+  genre:
+    - Portfolio / case study:  Purpose / Role / Result / Insight
+    - Product / feature:        Problem / Approach / Outcome / Why-it-matters
+    - Research:                 Question / Method / Finding / Implication
+  The four-beat rhythm is the point: the eye learns where to find "what is it ->
+  what was done -> what happened -> what it means" and reuses that map on every
+  such slide. Keep each section body within the density limit (below); the most
+  common substitution is to replace the Result section's prose with a mini-table
+  or a 2-3 item KPI strip.
+
+COMPARISON / MATCHING TABLE (for fit, mapping, or 1:1 comparison pages):
+  Coordinates (1280 reference): x = 38, y = 142, width 1204. Total height =
+  30 (header) + 5 x 76 (rows) = 410, ending at y = 552.
+  - Header row (~30 px tall): cells on accent-fill, headers 12 pt/700 ink,
+    centered.
+  - Body rows (~76 px tall): up to 5 rows (more compresses readability). Each
+    row: a left criterion cell (~280 px: title + parenthetical sub-label) -> a
+    small accent arrow in a narrow center channel (~24 px) -> a right evidence
+    cell (~900 px: evidence line + a sub-line tying it to a broader claim).
+  - For 6+ rows, compress row height (~64 px) and tighten body, or split across
+    slides.
+
+CALLOUT / CLOSING BLOCK (a framed statement, e.g. a deck's final affirmation):
+  Coordinates (1280 reference): width 1204 x height ~112; when paired below a
+  matching table, position at y = 568.
+  - Container on parchment or dark fill, 12 px radius, no border, no shadow.
+  - Inner: a small accent bar (~4 x 26 px) + an all-caps label (10 pt/700,
+    accent) + a 1-2 line statement (~13 pt) with bold key phrases. Use to
+    restate the core message in one breath.
+
+COVER SLIDE:
+  Coordinates (1280 reference): asymmetric two-zone. A visual/identity zone on
+  one side (e.g. left x = 38, width ~480) and a content stack on the other
+  (e.g. right x = 540, width ~700).
+  - No footer, no page number (the deck hasn't begun).
+  - Content stack, top to bottom: a small all-caps context label (10 pt/700),
+    a hero headline (<= 2 lines, one phrase in the accent), a 1-2 line lead
+    paragraph, an optional KPI strip (up to 4 cards, each ~150 x 92), and an
+    optional chip strip of key themes/competencies (~22 px tall pills).
+
+CATALOGUE PAGES (overview / index / timeline):
+  Both use the standard header anchors; content fills the body region
+  (x = 38, y = 156 -> 678, width 1204).
+  - Overview page: a multi-column or 2x2 catalogue (e.g. activities / items /
+    categories). For 3 columns use ~393 px each (12 px gutters at x = 38 / 445 /
+    852); each quadrant a sub-header in the title-marker pattern + a
+    hairline-only mini-table of rows.
+  - Timeline page: a horizontal year/phase timeline spanning the body width,
+    with cards anchored at start points and extending across durations; cards
+    may embed real screenshots for visual richness. These pages usually sit
+    right after the cover, before the deep-dive slides.
+
+--------------------------------------------------------------------------------
+DENSITY LIMITS
+--------------------------------------------------------------------------------
+Enforced to prevent crowding:
+  Per content-section body:   max 3 lines of body prose
+  Per slide title:            max 2 lines (1 preferred)
+  Per message bar:            exactly 1 line (no wrap)
+  Per meta row:               exactly 1 line
+  Per table cell inner block: max 2 lines
+  Per callout statement:      max 2 lines
+If content exceeds a limit, split across slides or move detail into a visual —
+do NOT shrink the font below the body floor.
+
+--------------------------------------------------------------------------------
+DO / DON'T
+--------------------------------------------------------------------------------
+Do
+  - Use one font family across the whole deck.
+  - Keep title, message bar, and meta row at the fixed anchor coordinates on
+    every slide.
+  - If a title marker is used, use it on every content slide.
+  - Respect the body-floor (12 pt dense / 14 pt presentation) and the 9 pt
+    all-text floor.
+  - Respect the spacing tiers; widen at section boundaries.
+  - Use the four-section template for any in-depth single-item slide.
+  - Keep one primary accent; let surface and hairline do the structural work.
+  - Apply the single drop shadow to photographic imagery only.
+  - Render Korean and Latin at the same size in the same line.
+  - Replace thin content with a visual instead of padding with filler.
+
+Don't
+  - Don't mix two visible fonts.
+  - Don't render body prose below the chosen floor, or any text below 9 pt.
+  - Don't move or resize the header anchors between slides.
+  - Don't introduce a second/third accent for decoration (the secondary accent
+    is for conclusion/warning markers only).
+  - Don't color whole section headers with the accent — use a number badge.
+  - Don't add shadows to cards, buttons, or text.
+  - Don't use decorative gradients.
+  - Don't tighten Korean body line-height below 1.4.
+  - Don't pad cells with filler to hit a density target — use whitespace or a
+    visual.
+  - Don't force dark/light alternation by default — pick one surface mode and
+    stay consistent unless the deck is a long narrative that benefits from
+    chapter breaks.
+
+--------------------------------------------------------------------------------
+ITERATION GUIDE
+--------------------------------------------------------------------------------
+1. Start with the spine: place title, message bar, and meta row at the fixed
+   coordinates before adding anything else.
+2. Pick the page template before writing content (cover / overview / timeline /
+   four-section / comparison table / closing).
+3. Pick ONE surface mode and ONE accent for the whole deck.
+4. Validate density first: allocate <= 3 lines per section; if it won't fit,
+   plan a visual or a second slide.
+5. Validate spacing tiers: walk down the slide, label each gap 1/2/3/4, fix any
+   mis-tiered gap before polishing copy.
+6. When unsure about emphasis: change surface or weight before adding chrome.
+7. When unsure about spacing: go up one tier.
+8. When unsure about volume: cut to the limit before shrinking the font.
+9. 16:9 always. One font always. The 9 pt floor always.
+
+--------------------------------------------------------------------------------
+CHANGELOG (v4 vs v3)
+--------------------------------------------------------------------------------
+GENERALIZED — Removed the Apple-imitation framing and "reverent product
+  photography" voice. v4 is genre-neutral (portfolio, pitch, report, lecture).
+GENERALIZED — Font is no longer a single mandated typeface. One-font-per-deck
+  rule retained; Pretendard preferred, Calibri (or similar) as a stated fallback
+  for environments where the preferred font is unavailable.
+GENERALIZED — Surface mode is now a per-deck choice (light default / dark /
+  alternating) instead of mandatory light<->dark alternation. Light-consistent
+  is the recommended default.
+GENERALIZED — "Matching table", "closing block", and the four-section template
+  were reframed from resume/job-application specifics to general patterns, with
+  per-genre label sets (Purpose/Role/Result/Insight, Problem/Approach/Outcome/
+  Why, Question/Method/Finding/Implication).
+REVISED — Body floor is now genre-tunable: 12 pt (dense) or 14 pt
+  (presentation), with 14 pt as the safer presentation default. 9 pt remains the
+  absolute all-text floor.
+REVISED — Color tokens are described by ROLE with example hex (not fixed brand
+  values), so any palette can be slotted in. Single primary accent retained; an
+  optional secondary accent is scoped to conclusion/warning markers only.
+REMOVED — Brand-specific hex values as mandates, interactive hover/focus tokens,
+  and job-application-only copy. Interactive states apply only when exporting to
+  HTML and are out of scope for static decks.
+RETAINED — The anchor system, group-vs-group spacing tiers, density limits, the
+  single-image-shadow rule, and the four-beat content rhythm. These proved
+  genre-independent and are the core of the system.

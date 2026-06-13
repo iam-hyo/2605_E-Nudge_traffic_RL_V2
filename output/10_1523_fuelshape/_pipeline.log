@@ -1,0 +1,11 @@
+[pipeline] OUT=/home/hjj/2605_E-Nudge_traffic_RL_V2/output/10_1523_fuelshape
+[train] model_rl_base pid=3558617
+[train] model_rl_signal pid=3558618
+[train] model_rl_signal_attention pid=3558619
+[train done] model_rl_base rc=0 t=12080s
+[train done] model_rl_signal rc=0 t=12080s
+[train done] model_rl_signal_attention rc=0 t=15767s
+[best→final] done
+[dijkstra] saved
+[experiment] done → /home/hjj/2605_E-Nudge_traffic_RL_V2/output/10_1523_fuelshape
+[PIPELINE COMPLETE]

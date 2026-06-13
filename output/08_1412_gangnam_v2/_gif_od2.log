@@ -1,0 +1,47 @@
+
+=======================================================
+  최소 연료 경로 탐색 - 시뮬레이션
+=======================================================
+  ①  shortest_dijkstra
+  ④  rl_signal
+
+  경로   : od2_yangjae_yeongdong
+  시간대 : 08:00 병목
+  FPS    : 30  |  배속: 4x  |  링크당: 198ms
+  GIF    : /home/hjj/2605_E-Nudge_traffic_RL_V2/output/gif/gangnam_od2_short_rlsignal.gif
+
+  신호 준수: 적색=정지(우회전 포함), 녹색=통과, 파랑=좌회전통과
+  ③ rl_base: 경로 탐색 시 신호 미사용, 운행 중 교통법규 준수
+=======================================================
+
+/home/hjj/2605_E-Nudge_traffic_RL_V2/venv/lib/python3.13/site-packages/torch/cuda/__init__.py:187: UserWarning: CUDA initialization: The NVIDIA driver on your system is too old (found version 12020). Please update your GPU driver by downloading and installing a new version from the URL: http://www.nvidia.com/Download/index.aspx Alternatively, go to: https://pytorch.org to install a PyTorch version that has been compiled with your version of the CUDA driver. (Triggered internally at /pytorch/c10/cuda/CUDAFunctions.cpp:119.)
+  return torch._C._cuda_getDeviceCount() > 0
+  [로드] model_rl_signal.pth
+  [GIF] 헤드리스 렌더링 시작...
+  [rl_signal] 스텝11: 338933(green) 에서 left 위해 13.0s 대기
+  [shortest_dijkstra] 스텝11: 338933(green) 에서 left 위해 7.7s 대기
+  [rl_signal] 스텝16: 338269(red) 에서 left 위해 74.6s 대기
+  [shortest_dijkstra] 스텝16: 338269(red) 에서 straight 위해 29.8s 대기
+  [shortest_dijkstra] 스텝19: 339138(red) 에서 straight 위해 5.5s 대기
+  [shortest_dijkstra] 스텝21: 338268(red) 에서 right 위해 42.5s 대기
+  [rl_signal] 스텝19: 339088(red) 에서 right 위해 46.8s 대기
+  [GIF] 프레임 200...
+  [rl_signal] 스텝21: 339090(red) 에서 right 위해 91.0s 대기
+  [shortest_dijkstra] 스텝25: 339002(red) 에서 straight 위해 49.7s 대기
+  [shortest_dijkstra] 스텝28: 338226(red) 에서 left 위해 111.3s 대기
+  [GIF] 프레임 400...
+  [shortest_dijkstra] 스텝31: 341549(red) 에서 right 위해 84.8s 대기
+  [shortest_dijkstra] 스텝36: 341560(red) 에서 straight 위해 14.6s 대기
+  [shortest_dijkstra] 스텝40: 341512(red) 에서 straight 위해 56.8s 대기
+  [rl_signal] 스텝51: 342630(red) 에서 straight 위해 60.0s 대기
+  [rl_signal] 스텝56: 342633(red) 에서 straight 위해 54.9s 대기
+  [GIF] 프레임 600...
+  [rl_signal] 스텝57: 646354(red) 에서 straight 위해 51.2s 대기
+  [shortest_dijkstra] 스텝51: 341499(red) 에서 straight 위해 94.1s 대기
+  [rl_signal] 스텝62: 341540(red) 에서 right 위해 44.9s 대기
+  [shortest_dijkstra] 스텝58: 341546(red) 에서 straight 위해 84.3s 대기
+  [rl_signal] 스텝65: 341546(red) 에서 left 위해 116.9s 대기
+  [GIF] 프레임 800...
+
+  [GIF] 저장 중... (811 프레임)
+  [GIF] 저장 완료: /home/hjj/2605_E-Nudge_traffic_RL_V2/output/gif/gangnam_od2_short_rlsignal.gif

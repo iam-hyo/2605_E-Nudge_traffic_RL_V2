@@ -1,0 +1,9 @@
+[attn] start
+[train] od1_attn pid=171248
+[train] od2_attn pid=171249
+[train done] od1_attn rc=0 t=8100s
+[train done] od2_attn rc=0 t=8100s
+[best->final attn] done
+[experiment-full] od1 done
+[experiment-full] od2 done
+[ATTN ADDON COMPLETE]

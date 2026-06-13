@@ -1,0 +1,72 @@
+  실험 범위: route=['t1_seonjeongneung_daechi', 't2_yeoksam_hakyeoul', 't3_sinsa_daechi'] time_slot=['off_peak', 'peak'] repeat=30
+
+──────────────────────────────────────────────────
+ 모델: shortest_dijkstra
+  t1_seonjeongneung_daechi | off_peak | reach=30/30 | 진행 30/720 | ETA 116s
+  t1_seonjeongneung_daechi | peak | reach=30/30 | 진행 60/720 | ETA 111s
+  t2_yeoksam_hakyeoul | off_peak | reach=30/30 | 진행 90/720 | ETA 126s
+  t2_yeoksam_hakyeoul | peak | reach=30/30 | 진행 120/720 | ETA 130s
+  t3_sinsa_daechi | off_peak | reach=30/30 | 진행 150/720 | ETA 140s
+  t3_sinsa_daechi | peak | reach=30/30 | 진행 180/720 | ETA 144s
+
+──────────────────────────────────────────────────
+ 모델: static_fuel_dijkstra
+  t1_seonjeongneung_daechi | off_peak | reach=30/30 | 진행 210/720 | ETA 433s
+  t1_seonjeongneung_daechi | peak | reach=30/30 | 진행 240/720 | ETA 660s
+  t2_yeoksam_hakyeoul | off_peak | reach=30/30 | 진행 270/720 | ETA 936s
+  t2_yeoksam_hakyeoul | peak | reach=30/30 | 진행 300/720 | ETA 1096s
+  t3_sinsa_daechi | off_peak | reach=30/30 | 진행 330/720 | ETA 1293s
+  t3_sinsa_daechi | peak | reach=30/30 | 진행 360/720 | ETA 1508s
+  [로드] models/model_rl_base.pth
+
+──────────────────────────────────────────────────
+ 모델: rl_base
+  t1_seonjeongneung_daechi | off_peak | reach=28/30 | 진행 390/720 | ETA 1277s
+  t1_seonjeongneung_daechi | peak | reach=29/30 | 진행 420/720 | ETA 1078s
+  t2_yeoksam_hakyeoul | off_peak | reach=29/30 | 진행 450/720 | ETA 906s
+  t2_yeoksam_hakyeoul | peak | reach=27/30 | 진행 480/720 | ETA 755s
+  t3_sinsa_daechi | off_peak | reach=28/30 | 진행 510/720 | ETA 622s
+  t3_sinsa_daechi | peak | reach=27/30 | 진행 540/720 | ETA 504s
+  [로드] models/model_rl_signal.pth
+
+──────────────────────────────────────────────────
+ 모델: rl_signal
+  t1_seonjeongneung_daechi | off_peak | reach=24/30 | 진행 570/720 | ETA 398s
+  t1_seonjeongneung_daechi | peak | reach=27/30 | 진행 600/720 | ETA 303s
+  t2_yeoksam_hakyeoul | off_peak | reach=28/30 | 진행 630/720 | ETA 216s
+  t2_yeoksam_hakyeoul | peak | reach=26/30 | 진행 660/720 | ETA 138s
+  t3_sinsa_daechi | off_peak | reach=28/30 | 진행 690/720 | ETA 66s
+  t3_sinsa_daechi | peak | reach=26/30 | 진행 720/720 | ETA 0s
+[SKIP] rl_signal_attention
+
+==================================================
+ 실험 완료 → output/11_0428
+ 전체 실행 수: 720
+ 소요 시간: 1517.0s
+
+모델                         경로         시간대        연료mL           시간s        대기s      스텝    도달    좌/직/우
+─────────────────────────────────────────────────────────────────────────────────────────────────────
+shortest_dijkstra          t1_seonjeongneung_daechi off_peak     444.3±14.5    624.2  200.4  31.0  100%  2/27/2
+shortest_dijkstra          t1_seonjeongneung_daechi peak         476.4±43.8    780.6  287.7  31.0  100%  2/27/2
+shortest_dijkstra          t2_yeoksam_hakyeoul off_peak     699.2±19.9   1024.1  433.0  49.0  100%  4/42/3
+shortest_dijkstra          t2_yeoksam_hakyeoul peak         600.5±24.1    849.9  186.8  49.0  100%  4/42/3
+shortest_dijkstra          t3_sinsa_daechi off_peak     970.7±38.0   1417.3  527.1  68.0  100%  6/55/7
+shortest_dijkstra          t3_sinsa_daechi peak         964.4±42.0   1501.9  506.2  68.0  100%  6/55/7
+static_fuel_dijkstra       t1_seonjeongneung_daechi off_peak     401.2±28.5    549.5  105.4  24.9  100%  3/19/3
+static_fuel_dijkstra       t1_seonjeongneung_daechi peak         404.3±36.5    568.2   56.9  26.3  100%  5/17/4
+static_fuel_dijkstra       t2_yeoksam_hakyeoul off_peak     579.0±23.4    798.2  147.5  44.1  100%  8/30/6
+static_fuel_dijkstra       t2_yeoksam_hakyeoul peak         586.4±28.2    908.2  182.8  38.3  100%  7/26/5
+static_fuel_dijkstra       t3_sinsa_daechi off_peak     805.6±30.6   1061.5  160.3  58.9  100%  12/35/13
+static_fuel_dijkstra       t3_sinsa_daechi peak         801.4±34.5   1111.0  110.2  71.3  100%  9/53/10
+rl_base                    t1_seonjeongneung_daechi off_peak    1255.2±467.9  1581.6  266.8  103.7   93%  10/55/39
+rl_base                    t1_seonjeongneung_daechi peak         548.6±408.8   819.7  214.1  30.3   97%  5/20/6
+rl_base                    t2_yeoksam_hakyeoul off_peak     885.4±431.2  1273.3  469.8  52.0   97%  9/34/10
+rl_base                    t2_yeoksam_hakyeoul peak         875.0±531.5  1314.3  343.1  56.7   90%  12/34/11
+rl_base                    t3_sinsa_daechi off_peak    1558.2±343.2  1961.7  407.3  126.4   93%  19/84/23
+rl_base                    t3_sinsa_daechi peak        1391.0±497.3  2066.6  500.4  108.8   90%  15/64/30
+rl_signal                  t1_seonjeongneung_daechi off_peak    1054.9±732.4  1250.8  196.7  80.9   80%  18/38/25
+rl_signal                  t1_seonjeongneung_daechi peak         666.1±506.9   973.5  237.4  43.9   90%  8/22/14
+rl_signal                  t2_yeoksam_hakyeoul off_peak    1364.3±590.5  1742.9  462.8  83.3   93%  14/45/24
+rl_signal                  t2_yeoksam_hakyeoul peak        1428.8±808.2  1997.5  403.5  90.7   87%  19/45/27
+rl_signal                  t3_sinsa_daechi off_peak    1158.6±564.5  1416.8  227.3  84.1   93%  16/45/23
+rl_signal                  t3_sinsa_daechi peak        1085.5±514.0  1497.7  225.2  83.2   87%  15/45/24

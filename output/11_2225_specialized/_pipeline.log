@@ -1,0 +1,16 @@
+[pipeline] OUT=/home/hjj/2605_E-Nudge_traffic_RL_V2/output/11_2225_specialized
+[train] od1_base pid=2314004
+[train] od1_signal pid=2314005
+[train] od2_base pid=2314006
+[train] od2_signal pid=2314007
+[train done] od1_base rc=0 t=3605s
+[train done] od1_signal rc=0 t=3605s
+[train done] od2_base rc=0 t=3605s
+[train done] od2_signal rc=0 t=3605s
+[best->final] done
+[experiment] od1 done
+[png] od1 done
+[experiment] od2 done
+[png] od2 done
+[report] /home/hjj/2605_E-Nudge_traffic_RL_V2/output/11_2225_specialized/report.md
+[PIPELINE COMPLETE]

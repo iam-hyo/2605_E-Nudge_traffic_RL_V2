@@ -1,0 +1,37 @@
+  실험 범위: route=['od1_sinnonhyeon_suseo'] time_slot=['peak'] repeat=30
+
+──────────────────────────────────────────────────
+ 모델: shortest_dijkstra
+  od1_sinnonhyeon_suseo | peak | reach=30/30 | 진행 30/150 | ETA 57s
+
+──────────────────────────────────────────────────
+ 모델: static_fuel_dijkstra
+  od1_sinnonhyeon_suseo | peak | reach=30/30 | 진행 60/150 | ETA 658s
+  [로드] models/model_rl_base.pth
+
+──────────────────────────────────────────────────
+ 모델: rl_base
+  od1_sinnonhyeon_suseo | peak | reach=28/30 | 진행 90/150 | ETA 330s
+  [로드] models/model_rl_signal.pth
+
+──────────────────────────────────────────────────
+ 모델: rl_signal
+  od1_sinnonhyeon_suseo | peak | reach=30/30 | 진행 120/150 | ETA 134s
+  [로드] models/model_rl_signal_attention.pth
+
+──────────────────────────────────────────────────
+ 모델: rl_signal_attention
+  od1_sinnonhyeon_suseo | peak | reach=29/30 | 진행 150/150 | ETA 0s
+
+==================================================
+ 실험 완료 → output/12_0156
+ 전체 실행 수: 150
+ 소요 시간: 653.9s
+
+모델                         경로         시간대        연료mL           시간s        대기s      스텝    도달    좌/직/우
+─────────────────────────────────────────────────────────────────────────────────────────────────────
+shortest_dijkstra          od1_sinnonhyeon_suseo peak        1565.5±30.9   2308.3  1066.7  80.0  100%  2/73/5
+static_fuel_dijkstra       od1_sinnonhyeon_suseo peak        1082.6±44.5   1313.2  127.7  67.0  100%  8/49/11
+rl_base                    od1_sinnonhyeon_suseo peak        1714.0±373.6  2371.8  426.7  115.6   93%  22/71/22
+rl_signal                  od1_sinnonhyeon_suseo peak        1364.5±160.8  1780.2  160.6  92.8  100%  14/61/18
+rl_signal_attention        od1_sinnonhyeon_suseo peak        1581.5±344.2  2138.5  331.0  99.0   97%  15/65/19

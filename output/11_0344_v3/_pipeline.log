@@ -1,0 +1,10 @@
+[pipeline] OUT=/home/hjj/2605_E-Nudge_traffic_RL_V2/output/11_0344_v3
+[train] model_rl_base pid=617394
+[train] model_rl_signal pid=617395
+[train done] model_rl_base rc=0 t=2676s
+[train done] model_rl_signal rc=0 t=2676s
+[best->final] done
+[dijkstra] saved
+[experiment] done (src=/home/hjj/2605_E-Nudge_traffic_RL_V2/output/11_0428)
+[report] /home/hjj/2605_E-Nudge_traffic_RL_V2/output/11_0344_v3/report.md
+[PIPELINE COMPLETE]

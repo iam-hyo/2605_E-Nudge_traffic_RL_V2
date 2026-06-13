@@ -20,13 +20,52 @@ import json
 import math
 import random
 import time
-from collections import defaultdict, deque
+from collections import defaultdict, deque, Counter
 from pathlib import Path
 
 import yaml
 
-from util.environment import RoadNetworkEnv
+from util.environment import RoadNetworkEnv, _phase_category
 from util.agent import DQNAgent
+from util.fuel_calculate import SpeedProfile, fuel_idle
+
+
+def _fuel_to_go(env: RoadNetworkEnv, goal: str, hour: float) -> dict:
+    """목표에서 역방향 연료-Dijkstra → 각 노드의 '목적지까지 예상 연료(mL)'.
+
+    potential-based shaping 용. 링크 비용 = 순항 주행연료 + 통과노드 기대 신호대기 idle.
+    회전·시간의존은 무시(정적 근사) — potential 은 근사여도 최적정책 불변(Ng 1999).
+    """
+    import heapq
+    slot = max(0, min(23, int((hour * 3600 - 7 * 3600) // 300)))
+
+    def exp_wait(nid: str) -> float:
+        sg = env.nodes[nid].get("signal")
+        if not sg:
+            return 0.0
+        c = sg["cycle_length"]
+        g = sum(p["duration"] for p in sg["phases"]
+                if _phase_category(p["type"]) == "green")
+        red = c - g
+        return (red * red) / (2 * c) if c else 0.0   # 균등 도착 기대 대기
+
+    dist = {goal: 0.0}
+    pq = [(0.0, goal)]
+    while pq:
+        d, u = heapq.heappop(pq)
+        if d > dist.get(u, 1e18):
+            continue
+        for v, lid in env.adj.get(u, []):
+            lk = env.links[lid]
+            v_kh = env.speed_db.get(lid, [35.0] * 24)[slot]
+            v_ms = max(5.0, v_kh) / 3.6
+            drive = SpeedProfile(v_ms, v_ms, v_ms, lk["len"]).total_fuel() * 1000.0
+            idle  = fuel_idle(exp_wait(u)) * 1000.0
+            nd = d + drive + idle
+            if nd < dist.get(v, 1e18):
+                dist[v] = nd
+                heapq.heappush(pq, (nd, v))
+    return dist
 
 
 def load_cfg(cfg_path: str = "config/config.yaml") -> dict:
@@ -106,8 +145,11 @@ def _build_train_envs(cfg: dict, use_signal: bool) -> list[dict]:
             env.max_steps = train_max
         if spec.get("use_config_routes"):
             routes = list(cfg["experiments"]["routes"])
-            # 주 실험 경로(첫 항목)를 추가 복제 → 학습 비중 강화
-            routes += [cfg["experiments"]["routes"][0]] * spec.get("primary_boost", 0)
+            # 정적 primary_boost (첫 경로 복제) — dynamic_od_boost 미사용 시에만.
+            # dynamic_od_boost=True 면 학습 루프에서 도달률 역가중으로 동적 선택하므로
+            # 정적 복제는 생략(중복 방지).
+            if not cfg["train"].get("dynamic_od_boost"):
+                routes += [cfg["experiments"]["routes"][0]] * spec.get("primary_boost", 0)
         else:
             routes = _random_routes(env, n=spec.get("n_random_routes", 12))
         out.append({
@@ -120,16 +162,20 @@ def _build_train_envs(cfg: dict, use_signal: bool) -> list[dict]:
 
 
 def _dist_to_goal(env: RoadNetworkEnv) -> float:
-    """현재 노드에서 목표 중심까지 유클리드 거리."""
+    """현재 노드→목표 중심 유클리드 거리. 위경도면 경도축 cos(lat) 보정(미터 비율 정렬)."""
     pos  = env.nodes[env.current_node]["pos"]
     goal = env._goal_center
-    return math.hypot(pos[0] - goal[0], pos[1] - goal[1])
+    xs = getattr(env, "lon_scale", 1.0)
+    return math.hypot((pos[0] - goal[0]) * xs, pos[1] - goal[1])
 
 
 def train_rl(mode: str, use_signal: bool, cfg_path: str = "config/config.yaml",
-             save_name: str | None = None):
+             save_name: str | None = None, episodes_override: int | None = None):
     cfg = load_cfg(cfg_path)
     tc  = cfg["train"]
+    # attention 등 모델별 epoch 보정 — launcher가 episodes_override 전달.
+    if episodes_override:
+        tc["episodes"] = int(episodes_override)
 
     train_envs = _build_train_envs(cfg, use_signal)
     env_weights = [te["weight"] for te in train_envs]
@@ -150,7 +196,25 @@ def train_rl(mode: str, use_signal: bool, cfg_path: str = "config/config.yaml",
     checkpoint_every = tc.get("checkpoint_every", 500)
     warmup_steps     = tc.get("warmup_steps", 3000)
     shaping_w        = tc.get("shaping_weight", 0.0)
+    fuel_shaping_w   = tc.get("fuel_shaping_weight", 0.0)   # 연료 potential shaping
+    _f2g_cache: dict = {}
     uturn_penalty    = float(cfg.get("reward", {}).get("uturn_penalty", 0.0))
+    revisit_penalty  = float(cfg.get("reward", {}).get("revisit_penalty", 0.0))
+    step_penalty     = float(cfg.get("reward", {}).get("step_penalty", 0.0))
+    dynamic_od_boost = bool(tc.get("dynamic_od_boost", False))
+    # 동적 OD 부스트: 최근 도달률이 낮은 OD 를 더 자주 샘플링 (역가중).
+    #   weight_i = max(boost_floor, 1 - reach_rate_i)  → reach 0 이면 1.0, reach 1 이면 floor.
+    od_boost_floor = float(tc.get("od_boost_floor", 0.15))
+    od_reach: dict[str, deque] = defaultdict(lambda: deque(maxlen=200))
+    # ── 보상 anneal — uturn/revisit 페널티를 학습 후반 감쇠해 연료최적성 복원 ──
+    #   pen_scale(ep) = max(floor, 1 - ep/(episodes*frac)) : 1.0 → floor 선형 감쇠 후 유지.
+    #   frac=0 이면 anneal 미적용(상수 1.0). 초반 페널티로 루프회피 학습 → 후반 fuel 신호 지배.
+    penalty_anneal_frac = float(tc.get("penalty_anneal_frac", 0.0))
+    penalty_floor       = float(tc.get("penalty_floor", 0.15))
+    def _pen_scale(ep):
+        if penalty_anneal_frac <= 0:
+            return 1.0
+        return max(penalty_floor, 1.0 - ep / (tc["episodes"] * penalty_anneal_frac))
 
     model_dir = Path(cfg["output"]["model_dir"])
     model_dir.mkdir(exist_ok=True)
@@ -178,7 +242,11 @@ def train_rl(mode: str, use_signal: bool, cfg_path: str = "config/config.yaml",
     log(f" ε: {tc['epsilon_start']} → {tc['epsilon_min']} "
         f"(decay={tc['epsilon_decay']}, ~{_ep_to_min(tc):.0f}ep)")
     log(f" shaping_w={shaping_w}  uturn_penalty={uturn_penalty}  "
+        f"revisit_penalty={revisit_penalty}  "
         f"arrival_bonus={cfg.get('reward', {}).get('arrival_bonus', 500.0)}")
+    log(f" dynamic_od_boost={dynamic_od_boost} (floor={od_boost_floor})")
+    log(f" penalty_anneal_frac={penalty_anneal_frac} floor={penalty_floor}")
+    log(f" fuel_shaping_w={fuel_shaping_w}")
     log(f"{'='*60}")
 
     history     = []
@@ -190,7 +258,16 @@ def train_rl(mode: str, use_signal: bool, cfg_path: str = "config/config.yaml",
         # ── 토폴로지 / 경로 / 시간대 선택 ─────────────────────────────────────
         te        = random.choices(train_envs, weights=env_weights, k=1)[0]
         env       = te["env"]
-        route     = random.choice(te["routes"])
+        # ── 경로 선택 — 동적 OD 부스트 (도달률 역가중) 또는 균등 ──────────────
+        if dynamic_od_boost and len(te["routes"]) > 1:
+            rweights = []
+            for r in te["routes"]:
+                dq = od_reach[r["name"]]
+                rr = (sum(dq) / len(dq)) if dq else 0.0   # 데이터 없으면 reach 0 → 많이 샘플
+                rweights.append(max(od_boost_floor, 1.0 - rr))
+            route = random.choices(te["routes"], weights=rweights, k=1)[0]
+        else:
+            route = random.choice(te["routes"])
         tslot     = random.choice(time_slots)
         route_key = te["name"]
         map_diag  = env.map_diag
@@ -201,12 +278,22 @@ def train_rl(mode: str, use_signal: bool, cfg_path: str = "config/config.yaml",
             start_hour  = tslot["start_hour"],
         )
 
+        # ── 연료 potential shaping: 목적지까지 예상 잔여연료표 (에피소드당 1회, 캐시) ──
+        f2g = None; f2g_norm = 1.0
+        if fuel_shaping_w > 0:
+            ck = (route_key, route["goal"], tslot["start_hour"])
+            if ck not in _f2g_cache:
+                _f2g_cache[ck] = _fuel_to_go(env, route["goal"], tslot["start_hour"])
+            f2g = _f2g_cache[ck]
+            f2g_norm = f2g.get(route["start"], 0.0) or 1.0
+
         ep_reward = 0.0
         ep_fuel   = 0.0
         ep_wait   = 0.0
         ep_steps  = 0
         ep_info   = {}
         move_counts = {"straight": 0, "left": 0, "right": 0, "uturn": 0}
+        visited   = {route["start"]: 1}   # 재방문 패널티용 노드 방문 카운트
 
         while True:
             valid = env.get_valid_actions()
@@ -224,8 +311,28 @@ def train_rl(mode: str, use_signal: bool, cfg_path: str = "config/config.yaml",
                 d_after  = _dist_to_goal(env)
                 reward  += shaping_w * (d_before - d_after) / map_diag
 
+            # ── 연료 potential shaping: Δ(목적지까지 예상 잔여연료) ──
+            #   reward += w · (fuel2go[이동前] - fuel2go[이동後]) / fuel2go[출발]
+            #   신호 적은 쪽으로 갈수록 잔여연료 더↓ → 보상↑. 합=상수라 최적정책 불변.
+            if f2g is not None:
+                pv = f2g.get(env.previous_node)
+                cv = f2g.get(env.current_node)
+                if pv is not None and cv is not None:
+                    reward += fuel_shaping_w * (pv - cv) / f2g_norm
+
+            pscale = _pen_scale(ep)
             if uturn_penalty > 0 and info.get("movement") == "uturn":
-                reward -= uturn_penalty
+                reward -= uturn_penalty * pscale
+
+            # 재방문 패널티 — 이미 방문한 노드로 다시 진입하면 부과 (루프 억제)
+            nxt_node = env.current_node
+            if revisit_penalty > 0 and visited.get(nxt_node, 0) > 0:
+                reward -= revisit_penalty * pscale
+            visited[nxt_node] = visited.get(nxt_node, 0) + 1
+
+            # 스텝 패널티 — 매 스텝 소액 비용 (장거리 배회 억제, 비-potential)
+            if step_penalty > 0:
+                reward -= step_penalty
 
             total_steps += 1
 
@@ -252,6 +359,7 @@ def train_rl(mode: str, use_signal: bool, cfg_path: str = "config/config.yaml",
         reached = ep_info.get("reached_goal", False)
         agent.end_episode()
         route_reach[route_key].append(reached)
+        od_reach[route["name"]].append(reached)   # per-OD 도달률 (동적 부스트 + 로깅)
 
         history.append({
             "episode": ep,
@@ -262,6 +370,7 @@ def train_rl(mode: str, use_signal: bool, cfg_path: str = "config/config.yaml",
             "epsilon": round(agent.epsilon, 4),
             "reached": reached,
             "route":   route_key,
+            "od":      route["name"],
             "moves":   move_counts.copy(),
         })
 
@@ -300,6 +409,13 @@ def train_rl(mode: str, use_signal: bool, cfg_path: str = "config/config.yaml",
                 f"ε={agent.epsilon:.3f}{loss_str} | t={elapsed:.0f}s{warmup_tag}")
             if rt_str:
                 log(f"          ├ 토폴로지 도달률(최근50): {rt_str}")
+            # per-OD 도달률(최근200) — OD-3 학습곡선 직접 확인용
+            od_str = "  ".join(
+                f"{k.split('_')[0]}={sum(v)/max(len(v),1):.0%}(n{len(v)})"
+                for k, v in sorted(od_reach.items())
+            )
+            if od_str:
+                log(f"          ├ OD별 도달률(최근200): {od_str}")
             log(f"          └ 이동 분포: {mv_str}")
 
             if reach_r > best_reach_rate and total_steps >= warmup_steps:
